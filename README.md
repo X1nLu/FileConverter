@@ -15,10 +15,6 @@
 
 > **→PDF** 的转换（Excel→PDF、Word→PDF、Markdown→PDF）需要系统已安装 **Microsoft Word** 或 **LibreOffice**。
 
-## 截图
-
-![主界面](screenshot.png)
-
 ## 使用方式
 
 ### 方式一：直接运行（需 Python 3.10+）
