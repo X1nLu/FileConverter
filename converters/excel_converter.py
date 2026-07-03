@@ -1,14 +1,13 @@
 from pathlib import Path
 from openpyxl import load_workbook
+from .pdf_export import docx_to_pdf
 
 
 class ExcelConverter:
 
     @staticmethod
     def to_pdf(xlsx_path: str, pdf_path: str):
-        import subprocess, sys
         from docx import Document
-        from docx.shared import Inches, Pt
 
         wb = load_workbook(xlsx_path)
         doc = Document()
@@ -31,24 +30,7 @@ class ExcelConverter:
         temp_docx = str(Path(pdf_path).with_suffix(".docx"))
         doc.save(temp_docx)
 
-        try:
-            if sys.platform == "win32":
-                import win32com.client
-                word = win32com.client.Dispatch("Word.Application")
-                word.Visible = False
-                wd = word.Documents.Open(temp_docx)
-                wd.SaveAs(pdf_path, FileFormat=17)
-                wd.Close()
-                word.Quit()
-            else:
-                subprocess.run(
-                    ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir",
-                     str(Path(pdf_path).parent), temp_docx],
-                    check=True, capture_output=True
-                )
-        except Exception:
-            raise RuntimeError("Excel -> PDF 需安装 MS Word (Windows) 或 LibreOffice (Linux/Mac)")
-
+        docx_to_pdf(temp_docx, pdf_path, "Excel -> PDF 需安装 MS Word (Windows) 或 LibreOffice (Linux/Mac)")
         Path(temp_docx).unlink(missing_ok=True)
 
     @staticmethod

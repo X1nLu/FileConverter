@@ -2,6 +2,12 @@
 
 一个轻量的 Windows 桌面工具，支持 PDF、Excel、Word、Markdown 四种格式之间的相互转换。
 
+## 更新说明
+
+- 已移除 `requirements.txt` 中未实际使用的 `PyQt6` 依赖，依赖更精简。
+- 新增 `converters/pdf_export.py`，统一 `docx -> PDF` 导出逻辑，减少重复代码。
+- 批量转换时增强错误处理：遇到单个文件失败不再中断整个队列，完成后会显示失败摘要。
+
 ## 功能
 
 支持 12 种转换组合：
@@ -37,15 +43,18 @@ pyinstaller --onefile --windowed --name "文件转换工具" --add-data "convert
 
 ```
 FileConverter/
-├── main.py              # 入口
-├── converters/          # 转换核心
-│   ├── pdf_converter.py
-│   ├── excel_converter.py
-│   ├── word_converter.py
-│   └── markdown_converter.py
+├── main.py                    # 应用入口，启动 Tkinter 窗口
+├── converters/                # 格式转换核心逻辑
+│   ├── __init__.py            # 转换注册表与调度入口
+│   ├── pdf_converter.py       # PDF 输入转换到 Excel/Word/Markdown
+│   ├── excel_converter.py     # Excel 输入转换到 PDF/Word/Markdown
+│   ├── word_converter.py      # Word 输入转换到 PDF/Excel/Markdown
+│   ├── markdown_converter.py  # Markdown 输入转换到 PDF/Excel/Word
+│   └── pdf_export.py          # 统一 docx -> PDF 导出工具
 ├── ui/
-│   └── main_window.py   # 界面
-└── requirements.txt
+│   └── main_window.py         # Tkinter 主窗口与批量转换界面
+├── requirements.txt           # 依赖列表
+└── README.md                  # 项目说明文档
 ```
 
 ## 技术栈

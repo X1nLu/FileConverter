@@ -155,28 +155,36 @@ class MainWindow(tk.Tk):
 
     def _run_conversion(self, files, from_ext, to_ext):
         total = len(files)
-        for idx, f in enumerate(files):
+        failed = []
+        fn = REGISTRY.get((from_ext, to_ext))
+        for idx, f in enumerate(files, start=1):
             output_path = str(self.output_dir / f"{f.stem}.{to_ext}")
-            self.after(0, lambda v=(idx, total): self._update_progress(*v))
+            self.after(0, lambda current=idx, total=total: self._update_progress(current, total))
             try:
-                fn = REGISTRY.get((from_ext, to_ext))
                 if fn:
                     fn(str(f), output_path)
             except Exception as e:
-                self.after(0, lambda msg=str(e): messagebox.showerror("转换失败", msg))
-                self.after(0, self._reset_convert_button)
-                return
-        self.after(0, self._on_conversion_finished)
+                failed.append((f.name, str(e)))
+        self.after(0, lambda: self._on_conversion_finished(failed, total))
 
     def _update_progress(self, current, total):
         self.progress["maximum"] = total
         self.progress["value"] = current
         self.progress_label.config(text=f"正在转换: {current}/{total}")
 
-    def _on_conversion_finished(self):
-        self.progress["value"] = self.progress["maximum"]
-        self.progress_label.config(text="转换完成！")
-        messagebox.showinfo("完成", "所有文件转换完成！")
+    def _on_conversion_finished(self, failed, total):
+        self.progress["value"] = total
+        if failed:
+            self.progress_label.config(text=f"已完成，{len(failed)} 个文件失败")
+            failed_names = "\n".join(f"{name}: {msg}" for name, msg in failed[:5])
+            summary = (
+                f"{total - len(failed)} 个文件转换成功，{len(failed)} 个文件转换失败。\n\n"
+                f"失败示例：\n{failed_names}"
+            )
+            messagebox.showwarning("部分完成", summary)
+        else:
+            self.progress_label.config(text="转换完成！")
+            messagebox.showinfo("完成", "所有文件转换完成！")
         self._reset_convert_button()
 
     def _reset_convert_button(self):

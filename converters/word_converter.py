@@ -1,29 +1,13 @@
 from pathlib import Path
 from docx import Document
+from .pdf_export import docx_to_pdf
 
 
 class WordConverter:
 
     @staticmethod
     def to_pdf(docx_path: str, pdf_path: str):
-        import subprocess, sys
-        try:
-            if sys.platform == "win32":
-                import win32com.client
-                word = win32com.client.Dispatch("Word.Application")
-                word.Visible = False
-                wd = word.Documents.Open(docx_path)
-                wd.SaveAs(pdf_path, FileFormat=17)
-                wd.Close()
-                word.Quit()
-            else:
-                subprocess.run(
-                    ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir",
-                     str(Path(pdf_path).parent), docx_path],
-                    check=True, capture_output=True
-                )
-        except Exception:
-            raise RuntimeError("Word -> PDF 需安装 MS Word (Windows) 或 LibreOffice (Linux/Mac)")
+        docx_to_pdf(docx_path, pdf_path, "Word -> PDF 需安装 MS Word (Windows) 或 LibreOffice (Linux/Mac)")
 
     @staticmethod
     def to_excel(docx_path: str, xlsx_path: str):

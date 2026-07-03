@@ -1,4 +1,5 @@
 from pathlib import Path
+from .pdf_export import docx_to_pdf
 
 
 class MarkdownConverter:
@@ -29,26 +30,8 @@ class MarkdownConverter:
         temp_docx = str(Path(pdf_path).with_suffix(".docx"))
         doc.save(temp_docx)
 
-        try:
-            import subprocess, sys
-            if sys.platform == "win32":
-                import win32com.client
-                word = win32com.client.Dispatch("Word.Application")
-                word.Visible = False
-                wd = word.Documents.Open(temp_docx)
-                wd.SaveAs(pdf_path, FileFormat=17)
-                wd.Close()
-                word.Quit()
-            else:
-                subprocess.run(
-                    ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir",
-                     str(Path(pdf_path).parent), temp_docx],
-                    check=True, capture_output=True
-                )
-        except Exception:
-            raise RuntimeError("Markdown -> PDF 需安装 MS Word (Windows) 或 LibreOffice (Linux/Mac)")
-        finally:
-            Path(temp_docx).unlink(missing_ok=True)
+        docx_to_pdf(temp_docx, pdf_path, "Markdown -> PDF 需安装 MS Word (Windows) 或 LibreOffice (Linux/Mac)")
+        Path(temp_docx).unlink(missing_ok=True)
 
     @staticmethod
     def to_excel(md_path: str, xlsx_path: str):
