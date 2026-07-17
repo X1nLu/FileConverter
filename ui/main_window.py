@@ -11,6 +11,7 @@ FILE_EXT_MAP = {
     "Excel": "xlsx",
     "Word": "docx",
     "Markdown": "md",
+    "ZIP (HTML→MD)": "zip",
 }
 
 
