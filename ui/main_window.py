@@ -14,19 +14,57 @@ FILE_EXT_MAP = {
     "ZIP (HTML→MD)": "zip",
 }
 
+# 格式对应的扩展名校验集合（添加文件时严格匹配）
+EXT_VALID_MAP = {
+    "pdf": {".pdf"},
+    "xlsx": {".xlsx", ".xls"},
+    "docx": {".docx", ".doc"},
+    "md": {".md", ".markdown"},
+    "zip": {".zip"},
+}
+
+# 格式对应的中文描述
+EXT_DESC_MAP = {
+    "pdf": "PDF",
+    "xlsx": "Excel",
+    "docx": "Word",
+    "md": "Markdown",
+    "zip": "ZIP",
+}
+
+# 友好错误消息映射
+ERROR_MESSAGES = [
+    ("zipfile.BadZipFile", "ZIP 文件已损坏"),
+    ("is not a zip file", "ZIP 文件已损坏"),
+    ("No such file", "文件不存在或已被移动"),
+    ("Permission denied", "文件被占用，无法读取"),
+    ("find_html_file", "ZIP 中未找到 HTML 文件"),
+    ("pdfplumber.open", "PDF 文件已损坏或无法解析"),
+    ("load_workbook", "Excel 文件已损坏或无法解析"),
+    ("python-docx", "Word 文件已损坏或无法解析"),
+    ("Word.Application", "→PDF 需安装 Microsoft Word"),
+    ("win32com", "→PDF 需安装 Microsoft Word"),
+    ("libreoffice", "→PDF 需安装 LibreOffice"),
+]
+
 
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("文件格式转换工具")
         self.geometry("700x550")
-        self.minsize(600, 450)
+        self.minsize(650, 500)
 
-        self.file_list = []
+        self.file_list = []       # List[Path]
+        self.file_status = {}     # {Path: "ok" | "error"}
         self.output_dir = Path.cwd() / "output"
 
         self._setup_ui()
         self._update_to_options()
+
+    # ------------------------------------------------------------------ #
+    #  UI 搭建
+    # ------------------------------------------------------------------ #
 
     def _setup_ui(self):
         # 输出目录
@@ -44,7 +82,7 @@ class MainWindow(tk.Tk):
         ttk.Label(conv_frame, text="从:").grid(row=0, column=0, padx=5, pady=5)
         self.cb_from = ttk.Combobox(conv_frame, values=sorted(FILE_EXT_MAP.keys()), state="readonly", width=12)
         self.cb_from.current(0)
-        self.cb_from.bind("<<ComboboxSelected>>", lambda e: self._update_to_options())
+        self.cb_from.bind("<<ComboboxSelected>>", lambda e: self._on_from_changed())
         self.cb_from.grid(row=0, column=1, padx=5, pady=5)
 
         ttk.Label(conv_frame, text="→").grid(row=0, column=2, padx=5, pady=5)
@@ -92,6 +130,10 @@ class MainWindow(tk.Tk):
         self.btn_convert.bind("<Enter>", lambda e: self.btn_convert.config(bg="#40a9ff"))
         self.btn_convert.bind("<Leave>", lambda e: self.btn_convert.config(bg="#1890ff"))
 
+    # ------------------------------------------------------------------ #
+    #  下拉框联动
+    # ------------------------------------------------------------------ #
+
     def _update_to_options(self):
         from_ext = FILE_EXT_MAP[self.cb_from.get()]
         self.cb_to.set("")
@@ -104,38 +146,90 @@ class MainWindow(tk.Tk):
         if options:
             self.cb_to.current(0)
 
+    def _on_from_changed(self):
+        """来源格式切换时：更新目标选项 + 刷新文件列表状态标记。"""
+        self._update_to_options()
+        self._refresh_file_list_display()
+
+    # ------------------------------------------------------------------ #
+    #  输出目录
+    # ------------------------------------------------------------------ #
+
     def _choose_output_dir(self):
         d = filedialog.askdirectory(title="选择输出目录")
         if d:
             self.output_dir = Path(d)
             self.dir_label.config(text=str(self.output_dir))
 
+    # ------------------------------------------------------------------ #
+    #  文件管理（含严格扩展名校验）
+    # ------------------------------------------------------------------ #
+
     def _add_files(self):
         from_ext = FILE_EXT_MAP[self.cb_from.get()]
+        valid_exts = EXT_VALID_MAP.get(from_ext, {f".{from_ext}"})
+        desc = EXT_DESC_MAP.get(from_ext, from_ext.upper())
+
         files = filedialog.askopenfilenames(
             title="选择文件",
-            filetypes=[(f"{from_ext.upper()}文件", f"*.{from_ext}"), ("所有文件", "*.*")]
+            filetypes=[(f"{desc}文件", f"*.{from_ext}"), ("所有文件", "*.*")]
         )
+
+        added = 0
+        rejected = []
         for path in files:
             f = Path(path)
+            ext = f.suffix.lower()
+
+            # 严格校验扩展名
+            if ext not in valid_exts:
+                rejected.append(f.name)
+                continue
+
             if f not in self.file_list:
                 self.file_list.append(f)
-                self.listbox.insert("end", f"{f.name}  ({f.parent})")
-        self._update_file_count()
+                self.file_status[f] = "ok"
+                added += 1
+
+        if rejected:
+            msg = "\n".join(rejected[:5])
+            suffix = f"\n……及其他 {len(rejected) - 5} 个" if len(rejected) > 5 else ""
+            messagebox.showwarning(
+                "文件格式不匹配",
+                f"以下文件不是 {desc} 格式，已跳过：\n\n{msg}{suffix}"
+            )
+
+        if added > 0:
+            self._refresh_file_list_display()
 
     def _clear_files(self):
         self.file_list.clear()
+        self.file_status.clear()
         self.listbox.delete(0, "end")
         self._update_file_count()
 
     def _remove_selected(self):
         for sel in reversed(self.listbox.curselection()):
             self.listbox.delete(sel)
-            self.file_list.pop(sel)
+            removed = self.file_list.pop(sel)
+            self.file_status.pop(removed, None)
         self._update_file_count()
 
     def _update_file_count(self):
         self.file_count_label.config(text=f"共 {len(self.file_list)} 个文件")
+
+    def _refresh_file_list_display(self):
+        """刷新文件列表显示（含状态标记）。"""
+        self.listbox.delete(0, "end")
+        for f in self.file_list:
+            status = self.file_status.get(f, "ok")
+            prefix = "✅" if status == "ok" else "❌"
+            self.listbox.insert("end", f"{prefix}  {f.name}  ({f.parent})")
+        self._update_file_count()
+
+    # ------------------------------------------------------------------ #
+    #  转换前预检
+    # ------------------------------------------------------------------ #
 
     def _start_conversion(self):
         if not self.file_list:
@@ -144,6 +238,14 @@ class MainWindow(tk.Tk):
 
         from_ext = FILE_EXT_MAP[self.cb_from.get()]
         to_ext = FILE_EXT_MAP[self.cb_to.get()]
+
+        # 预检：文件是否存在
+        missing = [f.name for f in self.file_list if not f.exists()]
+        if missing:
+            msg = "\n".join(missing[:5])
+            messagebox.showerror("文件不存在", f"以下文件不存在或已被移动：\n\n{msg}")
+            return
+
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.btn_convert.config(state="disabled", text="转换中...")
@@ -154,18 +256,27 @@ class MainWindow(tk.Tk):
         t = threading.Thread(target=self._run_conversion, args=(files, from_ext, to_ext), daemon=True)
         t.start()
 
+    # ------------------------------------------------------------------ #
+    #  转换执行
+    # ------------------------------------------------------------------ #
+
     def _run_conversion(self, files, from_ext, to_ext):
         total = len(files)
         failed = []
         fn = REGISTRY.get((from_ext, to_ext))
+
         for idx, f in enumerate(files, start=1):
             output_path = str(self.output_dir / f"{f.stem}.{to_ext}")
             self.after(0, lambda current=idx, total=total: self._update_progress(current, total))
             try:
                 if fn:
                     fn(str(f), output_path)
+                self.file_status[f] = "ok"
             except Exception as e:
-                failed.append((f.name, str(e)))
+                friendly = self._friendly_error(str(e), from_ext)
+                failed.append((f.name, friendly))
+                self.file_status[f] = "error"
+
         self.after(0, lambda: self._on_conversion_finished(failed, total))
 
     def _update_progress(self, current, total):
@@ -173,19 +284,41 @@ class MainWindow(tk.Tk):
         self.progress["value"] = current
         self.progress_label.config(text=f"正在转换: {current}/{total}")
 
+    # ------------------------------------------------------------------ #
+    #  错误处理
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _friendly_error(raw: str, from_ext: str) -> str:
+        """将 Python 异常转为友好的中文提示。"""
+        for keyword, msg in ERROR_MESSAGES:
+            if keyword.lower() in raw.lower():
+                return msg
+        # 按格式兜底
+        fallback = {
+            "pdf": "PDF 文件无法读取，可能已损坏",
+            "xlsx": "Excel 文件无法读取，可能已损坏",
+            "docx": "Word 文件无法读取，可能已损坏",
+            "md": "Markdown 文件无法读取",
+            "zip": "ZIP 文件无法读取，可能已损坏",
+        }
+        return fallback.get(from_ext, "文件无法读取，可能已损坏")
+
     def _on_conversion_finished(self, failed, total):
         self.progress["value"] = total
+        self._refresh_file_list_display()
+
         if failed:
             self.progress_label.config(text=f"已完成，{len(failed)} 个文件失败")
-            failed_names = "\n".join(f"{name}: {msg}" for name, msg in failed[:5])
+            failed_names = "\n".join(f"❌ {name}：{msg}" for name, msg in failed[:5])
             summary = (
-                f"{total - len(failed)} 个文件转换成功，{len(failed)} 个文件转换失败。\n\n"
-                f"失败示例：\n{failed_names}"
+                f"{total - len(failed)} 个文件转换成功，{len(failed)} 个文件转换失败\n\n"
+                f"{failed_names}"
             )
-            messagebox.showwarning("部分完成", summary)
+            messagebox.showwarning("转换结果", summary)
         else:
             self.progress_label.config(text="转换完成！")
-            messagebox.showinfo("完成", "所有文件转换完成！")
+            messagebox.showinfo("转换结果", f"全部 {total} 个文件转换成功")
         self._reset_convert_button()
 
     def _reset_convert_button(self):

@@ -1,0 +1,12 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd \"d:\\\\WWW\\\\Python\\\\FileConverter\" ; python -c \"\nfrom converters import REGISTRY\n# 列出所有支持的源格式\nsrc_exts = set\\(s for s, d in REGISTRY\\)\nprint\\('支持的源格式:', src_exts\\)\n\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd d:\\\\WWW\\\\Python\\\\FileConverter ; python -c \"\nfrom ui\\.main_window import MainWindow\nprint\\('✅ 导入成功'\\)\nprint\\('EXT_VALID_MAP:', MainWindow\\._friendly_error\\('zipfile\\.BadZipFile: test', 'zip'\\)\\)\nprint\\('EXT_VALID_MAP:', MainWindow\\._friendly_error\\('Permission denied: test\\.docx', 'docx'\\)\\)\nprint\\('EXT_VALID_MAP:', MainWindow\\._friendly_error\\('unknown error', 'pdf'\\)\\)\n\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
