@@ -30,4 +30,4 @@ def docx_to_pdf(docx_path: str, pdf_path: str, error_message: str):
                 capture_output=True,
             )
     except Exception as exc:
-        raise RuntimeError(error_message) from exc
+        raise RuntimeError(f"{error_message}: {exc}") from exc

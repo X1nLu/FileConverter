@@ -1,4 +1,5 @@
 import os
+import re
 import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -74,6 +75,7 @@ class MainWindow(tk.Tk):
         self.dir_label = ttk.Label(dir_frame, text=str(self.output_dir), foreground="#555")
         self.dir_label.pack(side="left", padx=5, fill="x", expand=True)
         ttk.Button(dir_frame, text="浏览...", command=self._choose_output_dir).pack(side="right")
+        ttk.Button(dir_frame, text="打开输出目录", command=self._open_output_dir).pack(side="right", padx=(0, 8))
 
         # 转换设置
         conv_frame = ttk.LabelFrame(self, text="转换设置", padding=10)
@@ -109,9 +111,12 @@ class MainWindow(tk.Tk):
         self.file_count_label = ttk.Label(btn_frame, text="共 0 个文件")
         self.file_count_label.pack(side="left", padx=5)
 
-        ttk.Button(btn_frame, text="添加文件", command=self._add_files).pack(side="left", padx=2)
-        ttk.Button(btn_frame, text="移除选中", command=self._remove_selected).pack(side="left", padx=2)
-        ttk.Button(btn_frame, text="清空列表", command=self._clear_files).pack(side="left", padx=2)
+        self.btn_add = ttk.Button(btn_frame, text="添加文件", command=self._add_files)
+        self.btn_add.pack(side="left", padx=2)
+        self.btn_remove = ttk.Button(btn_frame, text="移除选中", command=self._remove_selected)
+        self.btn_remove.pack(side="left", padx=2)
+        self.btn_clear = ttk.Button(btn_frame, text="清空列表", command=self._clear_files)
+        self.btn_clear.pack(side="left", padx=2)
 
         # 进度条
         self.progress = ttk.Progressbar(self, mode="determinate")
@@ -161,44 +166,123 @@ class MainWindow(tk.Tk):
             self.output_dir = Path(d)
             self.dir_label.config(text=str(self.output_dir))
 
+    def _open_output_dir(self):
+        if not self.output_dir.exists():
+            messagebox.showwarning("提示", "输出目录不存在，请先执行一次转换或手动创建目录")
+            return
+        try:
+            os.startfile(self.output_dir)
+        except Exception as exc:
+            messagebox.showerror("打开失败", f"无法打开输出目录：{exc}")
+
+    def _resolve_format_for_extension(self, ext: str) -> str | None:
+        for fmt, valid_exts in EXT_VALID_MAP.items():
+            if ext in valid_exts:
+                return fmt
+        return None
+
+    def _resolve_source_label(self, fmt: str) -> str | None:
+        return next((k for k, v in FILE_EXT_MAP.items() if v == fmt), None)
+
+    def _resolve_paths_format(self, paths: list[str]) -> str | None:
+        candidate_format = None
+        for path in paths:
+            ext = Path(path).suffix.lower()
+            fmt = self._resolve_format_for_extension(ext)
+            if fmt is None:
+                return None
+            if candidate_format is None:
+                candidate_format = fmt
+            elif candidate_format != fmt:
+                return None
+        return candidate_format
+
+    def _current_list_format(self) -> str | None:
+        if not self.file_list:
+            return None
+        formats = {self._resolve_format_for_extension(f.suffix.lower()) for f in self.file_list}
+        if None in formats or len(formats) != 1:
+            return None
+        return next(iter(formats))
+
+    def _switch_source_format(self, candidate_format: str) -> None:
+        target_label = self._resolve_source_label(candidate_format)
+        if target_label and self.cb_from.get() != target_label:
+            self.cb_from.set(target_label)
+            self._update_to_options()
+
+    def _filter_paths_by_format(self, paths: list[str], fmt: str) -> tuple[list[Path], list[str]]:
+        valid_exts = EXT_VALID_MAP.get(fmt, {f".{fmt}"})
+        accepted: list[Path] = []
+        rejected: list[str] = []
+        for path in paths:
+            f = Path(path)
+            if f.suffix.lower() in valid_exts:
+                accepted.append(f)
+            else:
+                rejected.append(f.name)
+        return accepted, rejected
+
+    def _append_files(self, files: list[Path]) -> int:
+        added = 0
+        for f in files:
+            if f not in self.file_list:
+                self.file_list.append(f)
+                self.file_status[f] = "ok"
+                added += 1
+        return added
+
+    def _show_rejected_files(self, rejected: list[str], desc: str) -> None:
+        if not rejected:
+            return
+        msg = "\n".join(rejected[:5])
+        suffix = f"\n……及其他 {len(rejected) - 5} 个" if len(rejected) > 5 else ""
+        messagebox.showwarning(
+            "文件格式不匹配",
+            f"以下文件不是 {desc} 格式，已跳过：\n\n{msg}{suffix}"
+        )
+
+    def _prepare_paths_for_add(self, paths: list[str], action_name: str) -> str | None:
+        candidate_format = self._resolve_paths_format(paths)
+        if candidate_format is None:
+            messagebox.showwarning(
+                "文件格式不一致",
+                f"{action_name}的文件包含多种格式或不支持的格式，请先统一格式后再操作。"
+            )
+            return None
+
+        existing_format = self._current_list_format()
+        if existing_format is not None and existing_format != candidate_format:
+            messagebox.showwarning(
+                "文件列表不一致",
+                "当前文件列表中已有不同格式的文件，请先清空列表或统一格式后再操作。"
+            )
+            return None
+
+        self._switch_source_format(candidate_format)
+        return candidate_format
+
     # ------------------------------------------------------------------ #
     #  文件管理（含严格扩展名校验）
     # ------------------------------------------------------------------ #
 
     def _add_files(self):
-        from_ext = FILE_EXT_MAP[self.cb_from.get()]
-        valid_exts = EXT_VALID_MAP.get(from_ext, {f".{from_ext}"})
-        desc = EXT_DESC_MAP.get(from_ext, from_ext.upper())
-
         files = filedialog.askopenfilenames(
             title="选择文件",
-            filetypes=[(f"{desc}文件", f"*.{from_ext}"), ("所有文件", "*.*")]
+            filetypes=[(f"{EXT_DESC_MAP.get(FILE_EXT_MAP[self.cb_from.get()], self.cb_from.get())}文件", f"*.{FILE_EXT_MAP[self.cb_from.get()]}",), ("所有文件", "*.*")]
         )
 
-        added = 0
-        rejected = []
-        for path in files:
-            f = Path(path)
-            ext = f.suffix.lower()
+        if not files:
+            return
 
-            # 严格校验扩展名
-            if ext not in valid_exts:
-                rejected.append(f.name)
-                continue
+        candidate_format = self._prepare_paths_for_add(files, "选择")
+        if candidate_format is None:
+            return
 
-            if f not in self.file_list:
-                self.file_list.append(f)
-                self.file_status[f] = "ok"
-                added += 1
-
-        if rejected:
-            msg = "\n".join(rejected[:5])
-            suffix = f"\n……及其他 {len(rejected) - 5} 个" if len(rejected) > 5 else ""
-            messagebox.showwarning(
-                "文件格式不匹配",
-                f"以下文件不是 {desc} 格式，已跳过：\n\n{msg}{suffix}"
-            )
-
+        accepted, rejected = self._filter_paths_by_format(files, candidate_format)
+        desc = EXT_DESC_MAP.get(candidate_format, candidate_format.upper())
+        added = self._append_files(accepted)
+        self._show_rejected_files(rejected, desc)
         if added > 0:
             self._refresh_file_list_display()
 
@@ -236,8 +320,15 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("提示", "请先添加文件")
             return
 
+        if not self.cb_to.get():
+            messagebox.showwarning("提示", "请选择目标格式")
+            return
+
         from_ext = FILE_EXT_MAP[self.cb_from.get()]
-        to_ext = FILE_EXT_MAP[self.cb_to.get()]
+        to_ext = FILE_EXT_MAP.get(self.cb_to.get())
+        if not to_ext:
+            messagebox.showerror("转换失败", "目标格式无效，请重新选择")
+            return
 
         # 预检：文件是否存在
         missing = [f.name for f in self.file_list if not f.exists()]
@@ -248,7 +339,15 @@ class MainWindow(tk.Tk):
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        fn = REGISTRY.get((from_ext, to_ext))
+        if fn is None:
+            messagebox.showerror("转换失败", f"不支持 {from_ext.upper()} → {to_ext.upper()} 的转换")
+            return
+
         self.btn_convert.config(state="disabled", text="转换中...")
+        self.btn_add.config(state="disabled")
+        self.btn_remove.config(state="disabled")
+        self.btn_clear.config(state="disabled")
         self.progress["value"] = 0
         self.progress_label.config(text="")
 
@@ -323,3 +422,6 @@ class MainWindow(tk.Tk):
 
     def _reset_convert_button(self):
         self.btn_convert.config(state="normal", text="开始转换")
+        self.btn_add.config(state="normal")
+        self.btn_remove.config(state="normal")
+        self.btn_clear.config(state="normal")

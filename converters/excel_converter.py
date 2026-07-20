@@ -77,6 +77,8 @@ class ExcelConverter:
                 lines.append("|" + "|".join("---" for _ in header) + "|")
                 for row in table_data[1:]:
                     lines.append("| " + " | ".join(row) + " |")
+            else:
+                lines.append("（本 Sheet 无内容）")
             lines.append("")
 
         Path(md_path).write_text("\n".join(lines), encoding="utf-8")
