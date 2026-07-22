@@ -6,37 +6,48 @@
 
 ---
 
-## 更新说明
+## 架构
 
-### 2026-07-21：重构为 Flutter + FastAPI 架构
+```mermaid
+flowchart TB
+    subgraph Frontend["Flutter 桌面端"]
+        UI["Material 3 UI\nhome_page.dart"]
+        Provider["状态管理\nconverter_provider.dart"]
+        API["HTTP 客户端\napi_client.dart"]
+        Proc["进程管理\npython_process.dart"]
+        UI --> Provider
+        Provider --> API
+    end
 
-- **全面重构**：从 Tkinter 单体应用重构为 **Flutter 前端 + Python FastAPI 后端** 的 C/S 架构。
-- **Flutter 桌面端**：全新的现代化 UI，支持文件选择、格式选择、转换进度显示。
-- **Python FastAPI 后端**：独立进程运行，通过 HTTP REST API 与 Flutter 通信，自动分配端口。
-- **异步转换**：后端提交任务后立即返回 `task_id`，Flutter 轮询进度，不阻塞 UI。
-- **健康检查与自动重连**：Flutter 启动时自动等待后端就绪，超时提示。
+    subgraph Backend["Python FastAPI 后端"]
+        FastAPI["FastAPI 入口\nmain.py"]
+        CS["转换调度\nconverter_service.py"]
+        TM["任务队列\ntask_manager.py"]
+        FastAPI --> CS
+        CS --> TM
+    end
 
-### 2026-07-17：新增错误验证机制
+    subgraph Converters["格式转换核心"]
+        PDF["PDF\npdf_converter.py"]
+        XLSX["Excel\nexcel_converter.py"]
+        DOCX["Word\nword_converter.py"]
+        MD["Markdown\nmarkdown_converter.py"]
+        HTML["ZIP HTML→MD\nhtml_converter.py"]
+        PDF_EXPORT["→PDF 导出\npdf_export.py"]
+    end
 
-- **严格文件扩展名校验**：添加文件时自动检查扩展名是否匹配当前格式（如 PDF 格式只接受 `.pdf`），不匹配的文件直接拒绝并弹出提示。
-- **文件列表状态标记**：每个文件前显示状态标记 — `✅` 正常、`❌` 转换失败，一目了然。
-- **友好的中文错误提示**：将 Python 异常（如 `zipfile.BadZipFile`、`Permission denied`）自动映射为通俗易懂的中文消息。
-- **转换前预检**：开始转换前检查所有文件是否存在，避免中途报错。
-- **转换后状态刷新**：转换完成后自动刷新文件列表，失败文件显示 `❌` 标记，结果弹窗简洁清晰。
+    subgraph Packaging["打包部署"]
+        PYPKG["PyInstaller\nbuild_backend.bat"]
+        INSTALLER["Inno Setup\nFileConverter.iss"]
+        UPDATE["GitHub Releases\n自动更新"]
+    end
 
-### 2026-07-017：新增 ZIP (HTML→MD) 转换
-
-- 新增 `converters/html_converter.py`，支持将浏览器 **Ctrl+S** 保存的 HTML 网页（打包为 ZIP）转换为 Markdown 格式。
-- 自动提取 HTML 中的标题、段落、表格、列表、代码块、提示框、流程图等元素，语义映射为 Markdown 语法。
-- 支持图片和附件提取：HTML 中的图片和附件自动提取到 `_assets/` 目录，Markdown 中引用相对路径。
-- 无图片/附件时仅输出纯 Markdown 单文件，不产生额外目录。
-- 新增依赖 `beautifulsoup4`。
-
-### 历史更新
-
-- 已移除 `requirements.txt` 中未实际使用的 `PyQt6` 依赖，依赖更精简。
-- 新增 `converters/pdf_export.py`，统一 `docx -> PDF` 导出逻辑，减少重复代码。
-- 批量转换时增强错误处理：遇到单个文件失败不再中断整个队列，完成后会显示失败摘要。
+    Frontend -- "HTTP REST\nMultipart 上传" --> Backend
+    Backend --> Converters
+    PYPKG --> Backend
+    INSTALLER --> Frontend
+    UPDATE --> Frontend
+```
 
 ---
 
@@ -76,16 +87,35 @@ python main.py
 
 > Flutter 会自动启动 Python 后端进程，无需手动启动。如需单独调试后端，可手动运行 `python python_backend/main.py`。
 
-### 方式二：构建 Flutter 可执行文件
+### 方式二：构建可分发安装包
+
+使用一键构建脚本，依次打包 Python 后端、构建 Flutter 前端、生成 Inno Setup 安装包。
 
 ```bash
-cd flutter_app
-flutter build windows --debug
+./build_all.bat
 ```
 
-构建产物：`flutter_app\build\windows\x64\runner\Debug\flutter_app.exe`
+构建产物：
 
-> 首次运行需要安装 Python 环境及依赖（`pip install -r requirements.txt`）。
+- `flutter_app\build\windows\x64\runner\Release\FileConverter Setup.exe` — 安装包
+- `flutter_app\build\windows\x64\runner\Release\flutter_app.exe` — Flutter 可执行文件
+- `flutter_app\build\windows\x64\runner\Release\backend\backend.exe` — Python 后端可执行文件
+
+> 安装包会自动安装到 `Program Files\FileConverter`，并创建开始菜单快捷方式。后端已打包为独立 exe，**无需用户安装 Python 环境**。
+
+### 方式三：分步构建
+
+```bash
+# 1. 打包 Python 后端
+./build_backend.bat
+
+# 2. 构建 Flutter 前端
+cd flutter_app
+flutter build windows --release
+
+# 3. 生成安装包（需安装 Inno Setup）
+iscc installer/FileConverter.iss
+```
 
 ---
 
@@ -127,6 +157,10 @@ FileConverter/
 │   ├── html_converter.py       # ZIP (HTML) 输入转换
 │   └── pdf_export.py           # 统一 docx -> PDF 导出
 ├── requirements.txt            # Python 依赖
+├── build_backend.bat           # PyInstaller 后端打包脚本
+├── build_all.bat               # 一键构建脚本
+├── installer/
+│   └── FileConverter.iss       # Inno Setup 安装脚本
 └── README.md                   # 项目说明文档
 ```
 
