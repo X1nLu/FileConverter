@@ -16,3 +16,10 @@ env/
 *.rar
 take_shot.py
 screenshot.png
+
+# 构建日志与产物
+*.log
+installer/*.exe
+
+# 后端上传/输出临时目录
+python_backend/temp/
