@@ -171,6 +171,7 @@ class ConverterProvider extends ChangeNotifier {
       final taskId = await _apiClient.submitConversion(
         filePath: _selectedFile!.path,
         targetFormat: _selectedFormat!.value,
+        outputDir: _outputDir,
       );
       debugPrint('转换任务已提交: $taskId');
 

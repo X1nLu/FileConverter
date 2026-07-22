@@ -29,11 +29,16 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() {});
   }
   void _openOutputDir() {
-    final dir = Directory(widget.provider.outputDir);
+    final resultPath = widget.provider.currentTask?.resultPath;
+    final dir = resultPath != null
+        ? Directory(File(resultPath).parent.path)
+        : Directory(widget.provider.outputDir);
+
     if (dir.existsSync()) {
       Process.start('explorer', [dir.path]);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

@@ -36,8 +36,8 @@ class _FileConverterAppState extends State<FileConverterApp> {
         useMaterial3: true,
         appBarTheme: const AppBarTheme(
           centerTitle: true,
-          elevation: 960,
-          scrolledUnderElevation: 964,
+          elevation: 4,
+          scrolledUnderElevation: 1,
         ),
       ),
       darkTheme: ThemeData(

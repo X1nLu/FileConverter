@@ -72,7 +72,11 @@ def formats():
 
 
 @app.post("/convert", response_model=TaskResponse)
-async def convert(file: UploadFile = File(...), target_format: str = Form(...)):
+async def convert(
+    file: UploadFile = File(...),
+    target_format: str = Form(...),
+    output_dir: str | None = Form(None),
+):
     """提交转换任务（multipart 上传）"""
     # 保存上传的文件到临时目录
     temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
@@ -89,7 +93,13 @@ async def convert(file: UploadFile = File(...), target_format: str = Form(...)):
     from_ext = from_ext.lstrip(".")  # 去掉点，与 REGISTRY 键格式一致
     to_ext = target_format
 
-    output_dir = temp_dir
+    if output_dir:
+        output_dir = os.path.normpath(os.path.abspath(output_dir))
+        os.makedirs(output_dir, exist_ok=True)
+    else:
+        output_dir = temp_dir
+
+    print(f"DEBUG: receive output_dir={output_dir}", flush=True)
 
     try:
         task_id = submit_conversion(

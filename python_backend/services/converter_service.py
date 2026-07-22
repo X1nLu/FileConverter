@@ -113,6 +113,7 @@ def submit_conversion(input_path: str, from_ext: str, to_ext: str, output_dir: s
         try:
             task_manager.set_running(task_id)
             output_path = str(Path(output_dir) / f"{Path(input_path).stem}.{to_ext}")
+            print(f"DEBUG: convert output_path={output_path}", flush=True)
             task_manager.set_progress(task_id, 0)
             fn(input_path, output_path)
             task_manager.set_completed(task_id, output_path)

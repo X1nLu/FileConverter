@@ -30,9 +30,11 @@ class ApiClient {
   Future<String> submitConversion({
     required String filePath,
     required String targetFormat,
+    required String outputDir,
   }) async {
     final request = http.MultipartRequest('POST', Uri.parse(ApiConfig.convertUrl));
     request.fields['target_format'] = targetFormat;
+    request.fields['output_dir'] = outputDir;
     request.files.add(
       await http.MultipartFile.fromPath('file', filePath),
     );

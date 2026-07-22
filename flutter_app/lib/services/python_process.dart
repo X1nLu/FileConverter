@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:path/path.dart' as path;
 import '../config/api_config.dart';
 
 class PythonProcessService {
@@ -15,7 +16,8 @@ class PythonProcessService {
   Future<int> start() async {
     if (_isRunning) return _port;
 
-    final pythonBackendDir = Directory.current.path;
+    final pythonScript = _findPythonBackendScript();
+    final workingDirectory = File(pythonScript).parent.path;
 
     // 设置环境变量指定端口
     final env = Map<String, String>.from(Platform.environment);
@@ -26,8 +28,8 @@ class PythonProcessService {
 
     _process = await Process.start(
       'python',
-      ['python_backend/main.py'],
-      workingDirectory: pythonBackendDir,
+      [pythonScript],
+      workingDirectory: workingDirectory,
       runInShell: true,
       environment: env,
     );
@@ -59,6 +61,34 @@ class PythonProcessService {
     });
 
     return _port;
+  }
+
+  String _findPythonBackendScript() {
+    final executableDir = File(Platform.resolvedExecutable).parent;
+    final scriptRelative = 'python_backend${Platform.isWindows ? r"\\main.py" : '/main.py'}';
+
+    final candidates = <Directory>[Directory.current, executableDir];
+    for (final base in candidates) {
+      final scriptPath = _searchUpForFile(base, scriptRelative, maxLevels: 10);
+      if (scriptPath != null) {
+        return scriptPath;
+      }
+    }
+
+    throw Exception('未找到 python_backend/main.py；请确保 Python 后端目录随可执行文件一起部署，或从仓库根目录启动应用。');
+  }
+
+  String? _searchUpForFile(Directory start, String relativeFile, {int maxLevels = 10}) {
+    var current = start;
+    for (var i = 0; i <= maxLevels; i++) {
+      final candidate = path.join(current.path, relativeFile);
+      if (File(candidate).existsSync()) {
+        return candidate;
+      }
+      if (current.parent.path == current.path) break;
+      current = current.parent;
+    }
+    return null;
   }
 
   Future<void> stop() async {

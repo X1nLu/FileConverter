@@ -21,7 +21,7 @@ class TaskProgress {
       status: json['status'] as String,
       progress: (json['progress'] as int?) ?? 0,
       total: (json['total'] as int?) ?? 1,
-      resultPath: json['result_path'] as String?,
+      resultPath: (json['result'] as String?) ?? (json['result_path'] as String?),
       error: json['error'] as String?,
     );
   }

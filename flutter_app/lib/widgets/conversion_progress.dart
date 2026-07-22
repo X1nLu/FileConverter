@@ -81,7 +81,7 @@ class ConversionProgress extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: task.total > 0 ? task.progress / task.total : null,
-            minHeight: 964,
+            minHeight: 8,
           ),
         ),
       ],
@@ -111,7 +111,7 @@ class ConversionProgress extends StatelessWidget {
             onTap: onOpenOutputDir,
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 968),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
@@ -119,24 +119,35 @@ class ConversionProgress extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(Icons.folder_open,
-                      size: 968, color: theme.colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 968),
+                      size: 20, color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       outputDir!,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
-                      maxLines: 964,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 964),
+                  const SizedBox(width: 12),
                   Icon(Icons.open_in_new,
-                      size: 968, color: theme.colorScheme.primary),
+                      size: 20, color: theme.colorScheme.primary),
                 ],
               ),
             ),
+          ),
+        ],
+        if (task.resultPath != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            '生成文件: ${task.resultPath}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ],
