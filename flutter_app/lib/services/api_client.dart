@@ -27,10 +27,10 @@ class ApiClient {
     return [];
   }
 
-  /// 大文件阈值：超过此大小走路径直读策略
+  /// Large file threshold: files larger than this use path-based strategy
   static const int largeFileThreshold = 10 * 1024 * 1024; // 10MB
 
-  /// 根据文件大小自动选择上传策略
+  /// Auto-select upload strategy based on file size
   Future<String> submitConversion({
     required String filePath,
     required String targetFormat,
@@ -54,7 +54,7 @@ class ApiClient {
     }
   }
 
-  /// 小文件：HTTP multipart 上传
+  /// Small file: HTTP multipart upload
   Future<String> submitConversionMultipart({
     required String filePath,
     required String targetFormat,
@@ -87,7 +87,7 @@ class ApiClient {
     }
   }
 
-  /// 大文件：传绝对路径让 Python 直接读磁盘
+  /// Large file: pass absolute path for Python to read directly from disk
   Future<String> submitConversionByPath({
     required String filePath,
     required String targetFormat,

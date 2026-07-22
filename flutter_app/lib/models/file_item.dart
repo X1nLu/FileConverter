@@ -1,4 +1,4 @@
-/// 文件扩展名白名单：每种来源格式允许的扩展名集合
+/// File extension whitelist: allowed extensions per source format
 const extValidMap = <String, Set<String>>{
   'pdf': {'.pdf'},
   'xlsx': {'.xlsx', '.xls'},
@@ -7,7 +7,7 @@ const extValidMap = <String, Set<String>>{
   'zip': {'.zip'},
 };
 
-/// 从文件后缀推断来源格式
+/// Infer source format from file extension
 String? resolveFormatForExtension(String ext) {
   for (final entry in extValidMap.entries) {
     if (entry.value.contains(ext.toLowerCase())) {
@@ -30,12 +30,12 @@ class FileItem {
     required this.size,
   });
 
-  /// 检查此文件的扩展名是否匹配指定格式
+  /// Check if this file's extension matches the specified format
   bool isValidForFormat(String formatKey) {
     return extValidMap[formatKey]?.contains(extension.toLowerCase()) ?? false;
   }
 
-  /// 推断此文件属于哪种来源格式
+  /// Infer which source format this file belongs to
   String? get inferredFormat => resolveFormatForExtension(extension);
 
   String get sizeFormatted {
@@ -58,8 +58,8 @@ class FormatOption {
     FormatOption(label: 'Word (.docx)', value: 'docx'),
     FormatOption(label: 'Excel (.xlsx)', value: 'xlsx'),
     FormatOption(label: 'Markdown (.md)', value: 'md'),
-    FormatOption(label: '图片 (.png)', value: 'png'),
-    FormatOption(label: '图片 (.jpg)', value: 'jpg'),
+    FormatOption(label: 'Image (.png)', value: 'png'),
+    FormatOption(label: 'Image (.jpg)', value: 'jpg'),
   ];
 
   static const List<FormatOption> wordFormats = [

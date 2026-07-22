@@ -34,7 +34,7 @@ class _FileConverterAppState extends State<FileConverterApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.detached) {
-      // 窗口关闭时确保杀死子进程
+      // Ensure child process is killed when window closes
       _provider.dispose();
     }
   }
@@ -42,7 +42,7 @@ class _FileConverterAppState extends State<FileConverterApp>
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '文件转换工具',
+      title: 'File Converter',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

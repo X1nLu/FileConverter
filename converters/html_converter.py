@@ -9,49 +9,49 @@ from bs4 import BeautifulSoup, Tag
 
 
 class HtmlConverter:
-    """将浏览器 Ctrl+S 保存的 HTML (打包为 ZIP) 转换为 Markdown。"""
+    """Convert browser Ctrl+S saved HTML (packed as ZIP) to Markdown."""
 
-    # 需要提取到 _assets/ 目录的附件扩展名
+    # Attachment extensions to extract to _assets/ directory
     ASSET_EXTENSIONS = {
-        # 图片
+        # Images
         ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".bmp", ".ico",
-        # 文档
+        # Documents
         ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-        # 其他
+        # Others
         ".zip", ".rar", ".7z", ".csv", ".txt",
     }
 
     @staticmethod
     def to_markdown(zip_path: str, md_path: str):
-        """将 ZIP 包中的 HTML 转换为 Markdown。"""
+        """Convert HTML from ZIP package to Markdown."""
         md_path = Path(md_path)
         md_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # 资源目录（仅当有图片或附件时创建）
+        # Assets directory (only created when there are images or attachments)
         assets_dir = md_path.parent / f"{md_path.stem}_assets"
         has_assets = False
 
         with zipfile.ZipFile(zip_path, "r") as z:
-            # 找到 HTML 文件
+            # Find HTML file
             html_name = HtmlConverter._find_html_file(z)
             html_content = z.read(html_name).decode("utf-8", errors="replace")
 
-            # 解析 HTML
+            # Parse HTML
             soup = BeautifulSoup(html_content, "html.parser")
 
-            # 提取标题作为 MD 文件名（如果未指定）
+            # Extract title as MD filename (if not specified)
             title_tag = soup.find("title")
             title = title_tag.get_text(strip=True) if title_tag else ""
 
-            # 移除不需要的元素
+            # Remove unwanted elements
             HtmlConverter._remove_unwanted(soup)
 
-            # 找到正文区域（优先 container/main/article，否则用 body）
+            # Find content area (prefer container/main/article, fallback to body)
             body = HtmlConverter._find_content_area(soup)
 
-            # 转换正文为 MD
+            # Convert content to MD
             md_lines = []
-            asset_map = {}  # 原始路径 -> 新文件名
+            asset_map = {}  # original path -> new filename
 
             if title:
                 md_lines.append(f"# {title}")
@@ -64,20 +64,20 @@ class HtmlConverter:
                     element, md_lines, z, html_name, assets_dir, asset_map
                 )
 
-            # 提取资源文件
+            # Extract asset files
             if asset_map:
                 has_assets = True
                 assets_dir.mkdir(parents=True, exist_ok=True)
                 HtmlConverter._extract_assets(z, asset_map, assets_dir)
 
-            # 写入 MD 文件
+            # Write MD file
             md_text = "\n".join(md_lines)
-            # 清理多余空行
+            # Clean up extra blank lines
             md_text = re.sub(r"\n{3,}", "\n\n", md_text)
             md_text = md_text.strip() + "\n"
             md_path.write_text(md_text, encoding="utf-8")
 
-        # 如果没有资源文件，删除空目录
+        # If no assets, delete empty directory
         if not has_assets and assets_dir.exists():
             try:
                 assets_dir.rmdir()
@@ -85,17 +85,17 @@ class HtmlConverter:
                 pass
 
     # ------------------------------------------------------------------ #
-    #  内部方法
+    #  Internal methods
     # ------------------------------------------------------------------ #
 
     @staticmethod
     def _find_html_file(z: zipfile.ZipFile) -> str:
-        """在 ZIP 中找到 HTML 文件。"""
+        """Find HTML file in ZIP."""
         html_candidates = []
         for name in z.namelist():
             lower = name.lower()
             if lower.endswith(".htm") or lower.endswith(".html"):
-                # 优先选择不在 _files 子目录中的（即顶层 HTML）
+                # Prefer HTML not in _files subdirectory (i.e., top-level)
                 if "/" not in name or not any(
                     part.endswith("_files") for part in name.split("/")
                 ):
@@ -103,19 +103,19 @@ class HtmlConverter:
                 else:
                     html_candidates.append(name)
         if not html_candidates:
-            raise ValueError("ZIP 文件中未找到 HTML 文件")
+            raise ValueError("No HTML file found in ZIP")
         return html_candidates[0]
 
     @staticmethod
     def _remove_unwanted(soup: BeautifulSoup):
-        """移除不需要的元素。"""
+        """Remove unwanted elements."""
         for tag in soup.find_all(["script", "style", "noscript", "iframe", "meta", "link"]):
             tag.decompose()
 
     @staticmethod
     def _find_content_area(soup: BeautifulSoup) -> Tag:
-        """找到正文区域。"""
-        # 优先用常见的内容容器
+        """Find content area."""
+        # Prefer common content containers
         for selector in [
             "div.container", "main", "article",
             ".content", ".post", ".article", ".doc-content",
@@ -135,16 +135,16 @@ class HtmlConverter:
         assets_dir: Path,
         asset_map: dict,
     ):
-        """递归转换 HTML 元素为 MD。"""
+        """Recursively convert HTML elements to MD."""
         tag = element.name
         if not tag:
-            # 纯文本节点
+            # Text node
             text = element.get_text(strip=True)
             if text:
                 md_lines.append(text)
             return
 
-        # 根据标签处理
+        # Process by tag
         if tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
             level = int(tag[1])
             text = HtmlConverter._get_inner_text(element)
@@ -179,7 +179,7 @@ class HtmlConverter:
         elif tag == "pre":
             code_tag = element.find("code")
             code_text = code_tag.get_text() if code_tag else element.get_text()
-            # 尝试检测语言
+            # Try to detect language
             lang = ""
             if code_tag and code_tag.get("class"):
                 classes = code_tag.get("class")
@@ -210,9 +210,9 @@ class HtmlConverter:
         elif tag == "a":
             href = element.get("href", "")
             text = HtmlConverter._get_inner_text(element) or href
-            # 处理 ZIP 内的附件链接
+            # Handle attachment links inside ZIP
             if "_files/" in href and not href.startswith("http"):
-                # 这是 ZIP 内的附件
+                # This is an attachment inside ZIP
                 orig_path = unquote(href)
                 asset_key = HtmlConverter._normalize_asset_path(orig_path, html_name)
                 new_name = HtmlConverter._generate_asset_name(asset_key, asset_map)
@@ -242,14 +242,14 @@ class HtmlConverter:
             md_lines.append("")
 
         elif tag == "div":
-            # 检测特殊 class
+            # Detect special class
             classes = element.get("class", [])
             if not isinstance(classes, list):
                 classes = []
 
             class_set = set(classes)
 
-            # 流程图 / diagram
+            # Flowchart / diagram
             if "diagram" in class_set or "flow-row" in class_set:
                 md_lines.append("```text")
                 text = HtmlConverter._get_diagram_text(element)
@@ -258,7 +258,7 @@ class HtmlConverter:
                 md_lines.append("")
                 return
 
-            # 提示框 — 用纯文本避免与 prefix 的 ** 冲突
+            # Callout - use plain text to avoid conflict with prefix **
             if "insight" in class_set:
                 prefix = "> "
                 if "insight-success" in class_set:
@@ -275,7 +275,7 @@ class HtmlConverter:
                 md_lines.append("")
                 return
 
-            # 普通 div — 递归子元素
+            # Regular div - recurse children
             for child in element.children:
                 if isinstance(child, Tag):
                     HtmlConverter._convert_element(
@@ -286,7 +286,7 @@ class HtmlConverter:
             classes = element.get("class", [])
             if not isinstance(classes, list):
                 classes = []
-            # flow-box 标签
+            # flow-box tag
             if any("flow-box" in (c or "") for c in classes):
                 text = element.get_text(strip=True)
                 if text:
@@ -297,15 +297,15 @@ class HtmlConverter:
                     md_lines.append(text)
 
         elif tag == "header":
-            # 跳过 header（已有 title 处理）
+            # Skip header (already handled by title)
             pass
 
         elif tag == "footer":
-            # 跳过 footer
+            # Skip footer
             pass
 
         elif tag == "nav":
-            # 跳过导航
+            # Skip navigation
             pass
 
         elif tag in ("section", "article", "main"):
@@ -316,7 +316,7 @@ class HtmlConverter:
                     )
 
         else:
-            # 其他标签 — 递归
+            # Other tags - recurse
             for child in element.children:
                 if isinstance(child, Tag):
                     HtmlConverter._convert_element(
@@ -325,7 +325,7 @@ class HtmlConverter:
 
     @staticmethod
     def _convert_table(element: Tag, md_lines: list):
-        """转换 HTML 表格为 MD 表格。"""
+        """Convert HTML table to MD table."""
         rows = element.find_all("tr")
         if not rows:
             return
@@ -342,16 +342,16 @@ class HtmlConverter:
         if not table_data:
             return
 
-        # 对齐列数
+        # Align column count
         max_cols = max(len(r) for r in table_data)
         table_data = [r + [""] * (max_cols - len(r)) for r in table_data]
 
-        # 表头
+        # Table header
         header = table_data[0]
         md_lines.append("| " + " | ".join(header) + " |")
         md_lines.append("|" + "|".join("---" for _ in header) + "|")
 
-        # 表体
+        # Table body
         for row in table_data[1:]:
             md_lines.append("| " + " | ".join(row) + " |")
 
@@ -359,7 +359,7 @@ class HtmlConverter:
 
     @staticmethod
     def _get_inner_text(element: Tag) -> str:
-        """获取元素的纯文本，处理行内元素。"""
+        """Get element plain text, handling inline elements."""
         parts = []
         for child in element.children:
             if isinstance(child, Tag):
@@ -398,7 +398,7 @@ class HtmlConverter:
 
     @staticmethod
     def _get_plain_text(element: Tag) -> str:
-        """获取纯文本，不添加任何 MD 格式标记（用于 insight 等已有语义容器的内部文本）。"""
+        """Get plain text without MD formatting (for callouts and other semantic containers)."""
         parts = []
         for child in element.children:
             if isinstance(child, Tag):
@@ -424,7 +424,7 @@ class HtmlConverter:
                 elif tag == "span":
                     parts.append(HtmlConverter._get_plain_text(child))
                 else:
-                    # strong, em, 及其他标签 — 只取纯文本
+                    # strong, em, and other tags - plain text only
                     parts.append(child.get_text(strip=True))
             else:
                 text = str(child).strip()
@@ -434,7 +434,7 @@ class HtmlConverter:
 
     @staticmethod
     def _get_diagram_text(element: Tag) -> str:
-        """提取流程图/图表的文本表示。"""
+        """Extract flowchart/diagram text representation."""
         lines = []
         for child in element.find_all(["div", "span"], recursive=True):
             text = child.get_text(strip=True)
@@ -450,16 +450,16 @@ class HtmlConverter:
 
     @staticmethod
     def _normalize_asset_path(orig_path: str, html_name: str) -> str:
-        """将 HTML 中的相对资源路径转为 ZIP 内的绝对路径。"""
-        # 如果已经是绝对路径（相对 ZIP 根）
+        """Convert relative resource path in HTML to absolute path within ZIP."""
+        # If already absolute path (relative to ZIP root)
         if not orig_path.startswith(".."):
-            # 可能是相对 HTML 文件的路径
+            # May be relative to HTML file path
             html_dir = os.path.dirname(html_name)
             if html_dir:
-                # 去掉可能的 ../ 前缀
+                # Remove possible ../ prefix
                 clean = orig_path.replace("\\", "/")
                 if clean.startswith("../"):
-                    # 相对于 ZIP 根
+                    # Relative to ZIP root
                     return os.path.normpath(clean.lstrip("../"))
                 else:
                     return os.path.normpath(f"{html_dir}/{clean}")
@@ -467,26 +467,26 @@ class HtmlConverter:
 
     @staticmethod
     def _generate_asset_name(asset_key: str, asset_map: dict) -> str:
-        """为资源生成唯一文件名。"""
-        # 如果已存在映射，直接返回
+        """Generate unique filename for asset."""
+        # If mapping already exists, return directly
         if asset_key in asset_map:
             return asset_map[asset_key]
 
-        # 生成新名称
+        # Generate new name
         basename = os.path.basename(asset_key)
         if basename:
-            # 检查是否重名
+            # Check for duplicate name
             existing_names = set(asset_map.values())
             if basename not in existing_names:
                 return basename
-            # 重名加后缀
+            # Add suffix if duplicate
             stem, ext = os.path.splitext(basename)
             counter = 1
             while f"{stem}_{counter}{ext}" in existing_names:
                 counter += 1
             return f"{stem}_{counter}{ext}"
 
-        # 无文件名，用 hash
+        # No filename, use hash
         stem = f"asset_{len(asset_map)}"
         return stem
 
@@ -496,39 +496,39 @@ class HtmlConverter:
         asset_map: dict,
         assets_dir: Path,
     ):
-        """从 ZIP 中提取资源文件到 assets 目录。"""
+        """Extract resource files from ZIP to assets directory."""
         for orig_path, new_name in asset_map.items():
             try:
-                # 尝试多种路径
+                # Try multiple paths
                 candidates = HtmlConverter._find_asset_in_zip(z, orig_path)
                 if candidates:
-                    # 使用第一个匹配
+                    # Use first match
                     zip_path = candidates[0]
                     data = z.read(zip_path)
                     dest = assets_dir / new_name
                     dest.write_bytes(data)
             except Exception:
-                # 跳过无法提取的资源
+                # Skip unextractable resources
                 pass
 
     @staticmethod
     def _find_asset_in_zip(z: zipfile.ZipFile, orig_path: str) -> list:
-        """在 ZIP 中查找资源文件（尝试多种路径变体）。"""
+        """Find resource file in ZIP (try multiple path variants)."""
         candidates = []
         norm = orig_path.replace("\\", "/")
 
-        # 精确匹配
+        # Exact match
         if norm in z.namelist():
             candidates.append(norm)
 
-        # 按文件名匹配
+        # Match by filename
         basename = os.path.basename(norm)
         for name in z.namelist():
             if name.endswith(f"/{basename}") or name.endswith(f"\\{basename}"):
                 if name not in candidates:
                     candidates.append(name)
 
-        # 模糊匹配（URL 编码等）
+        # Fuzzy match (URL encoding, etc.)
         unquoted = unquote(norm)
         if unquoted != norm:
             for name in z.namelist():

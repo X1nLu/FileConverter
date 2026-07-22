@@ -30,7 +30,7 @@ class MarkdownConverter:
         temp_docx = str(Path(pdf_path).with_suffix(".docx"))
         doc.save(temp_docx)
 
-        docx_to_pdf(temp_docx, pdf_path, "Markdown -> PDF 需安装 MS Word (Windows) 或 LibreOffice (Linux/Mac)")
+        docx_to_pdf(temp_docx, pdf_path, "Markdown -> PDF requires MS Word (Windows) or LibreOffice (Linux/Mac)")
         Path(temp_docx).unlink(missing_ok=True)
 
     @staticmethod
@@ -39,7 +39,7 @@ class MarkdownConverter:
 
         wb = Workbook()
         ws = wb.active
-        ws.title = "Markdown内容"
+        ws.title = "Markdown Content"
 
         text = Path(md_path).read_text(encoding="utf-8")
         row_idx = 1

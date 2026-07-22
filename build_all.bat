@@ -1,13 +1,13 @@
 @echo off
 chcp 65001 >nul
-title FileConverter 全量构建
+title FileConverter Full Build
 
 echo ============================================
 echo  FileConverter Full Build Script
 echo ============================================
 echo.
 
-REM ── Step 1: 构建 Flutter Release ──
+REM ── Step 1: Build Flutter Release ──
 echo [1/4] Building Flutter Release...
 cd /d "%~dp0flutter_app"
 call flutter build windows --release
@@ -19,18 +19,18 @@ if %ERRORLEVEL% neq 0 (
 echo [1/4] Flutter Release build SUCCESS
 echo.
 
-REM ── Step 2: 打包 Python 后端 ──
+REM ── Step 2: Package Python Backend ──
 echo [2/4] Packaging Python backend...
 cd /d "%~dp0"
 call build_backend.bat
-REM build_backend.bat 末尾有 pause，这里不需要重复
+REM build_backend.bat has its own pause, no need to repeat
 echo [2/4] Python backend build SUCCESS
 echo.
 
-REM ── Step 3: 编译 Inno Setup 安装包 ──
+REM ── Step 3: Compile Inno Setup Installer ──
 echo [3/4] Compiling installer...
 set "ISCC="
-REM 查找 Inno Setup 编译器
+REM Find Inno Setup compiler
 if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set "ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if exist "C:\Program Files\Inno Setup 6\ISCC.exe" set "ISCC=C:\Program Files\Inno Setup 6\ISCC.exe"
 if exist "C:\Program Files (x86)\Inno Setup 5\ISCC.exe" set "ISCC=C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
@@ -52,7 +52,7 @@ pause
 )
 echo.
 
-REM ── Step 4: 输出汇总 ──
+REM ── Step 4: Output Summary ──
 echo [4/4] BUILD COMPLETE!
 echo.
 echo ============================================

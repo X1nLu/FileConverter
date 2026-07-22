@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import '../config/api_config.dart';
 
-/// 当前应用版本号（与 pubspec.yaml version 保持一致）
+/// Current app version (keep in sync with pubspec.yaml version)
 const String kAppVersion = '1.0.0';
 
-/// GitHub 仓库信息
+/// GitHub repository info
 const String kGitHubOwner = 'X1nLu';
 const String kGitHubRepo = 'FileConverter';
 
@@ -23,7 +23,7 @@ class PythonProcessService {
   int get port => _port;
   Future<void> get portReady => _portReady.future;
 
-  // ── 启动后端 ──────────────────────────────────────────────────
+  // ── Start Backend ──────────────────────────────────────────────────
 
   Future<int> start() async {
     if (_isRunning) return _port;
@@ -33,11 +33,11 @@ class PythonProcessService {
 
     await _cleanupOrphanProcess();
 
-    // 查找后端可执行文件
+    // Find backend executable
     final backendExe = _findBackendExe();
     final workingDirectory = File(backendExe).parent.path;
 
-    // 创建心跳文件
+    // Create heartbeat file
     _heartbeatFilePath = path.join(
       Directory.systemTemp.path,
       'fileconverter_heartbeat_${DateTime.now().millisecondsSinceEpoch}.tmp',
@@ -94,9 +94,9 @@ class PythonProcessService {
         final exitCode = await proc.exitCode.timeout(
           const Duration(seconds: 966),
         );
-        throw Exception('Python 后端进程异常退出 (exit code: $exitCode)$detail');
+        throw Exception('Python backend process exited abnormally (exit code: $exitCode)$detail');
       } else {
-        throw Exception('Python 后端进程启动失败$detail');
+        throw Exception('Python backend process failed to start$detail');
       }
     } catch (_) {
       rethrow;
@@ -106,7 +106,7 @@ class PythonProcessService {
     return _port;
   }
 
-  // ── 后端就绪确认 ──────────────────────────────────────────────
+  // ── Backend Ready Confirmation ──────────────────────────────────────
 
   void _confirmBackendReady() {
     _checkHealth(retriesLeft: 50);
@@ -131,7 +131,7 @@ class PythonProcessService {
     }
   }
 
-  // ── 心跳 ──────────────────────────────────────────────────────
+  // ── Heartbeat ──────────────────────────────────────────────────────
 
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
@@ -154,20 +154,20 @@ class PythonProcessService {
     });
   }
 
-  // ── 查找后端可执行文件 ────────────────────────────────────────
+  // ── Find Backend Executable ────────────────────────────────────────
 
-  /// 查找后端可执行文件：
-  /// 1. 打包环境：Flutter exe 同级的 backend/backend.exe
-  /// 2. 开发环境：向上搜索 python_backend/main.py
+  /// Find backend executable：
+  /// 1. Packaged: backend/backend.exe next to Flutter exe
+  /// 2. Development: search up for python_backend/main.py
   String _findBackendExe() {
-    // 打包环境：相对于 Flutter exe 所在目录
+    // Packaged: relative to Flutter exe directory
     final exeDir = File(Platform.resolvedExecutable).parent;
     final bundledExe = path.join(exeDir.path, 'backend', 'backend.exe');
     if (File(bundledExe).existsSync()) {
       return bundledExe;
     }
 
-    // 开发环境：向上搜索 python_backend/main.py
+    // Development: search up for python_backend/main.py
     final scriptPath = _findPythonBackendScript();
     return scriptPath;
   }
@@ -186,8 +186,8 @@ class PythonProcessService {
     }
 
     throw Exception(
-      '未找到 python_backend/main.py 或 backend/backend.exe；'
-      '请确保后端文件随可执行文件一起部署。',
+      'python_backend/main.py or backend/backend.exe not found;'
+      'Please ensure the backend is deployed alongside the executable.',
     );
   }
 
@@ -208,7 +208,7 @@ class PythonProcessService {
     return null;
   }
 
-  // ── 孤儿进程清理 ──────────────────────────────────────────────
+  // ── Orphan Process Cleanup ──────────────────────────────────────────
 
   Future<void> _cleanupOrphanProcess() async {
     try {
@@ -228,7 +228,7 @@ class PythonProcessService {
     await Future.delayed(const Duration(milliseconds: 300));
   }
 
-  // ── 停止后端 ──────────────────────────────────────────────────
+  // ── Stop Backend ────────────────────────────────────────────────────
 
   Future<void> stop() async {
     _heartbeatTimer?.cancel();
@@ -268,10 +268,10 @@ class PythonProcessService {
     _process = null;
   }
 
-  // ── 自动更新检查 ──────────────────────────────────────────────
+  // ── Auto Update Check ──────────────────────────────────────────────
 
-  /// 检查 GitHub Releases 是否有新版本
-  /// 返回 {version, downloadUrl} 或 null（无更新/检查失败）
+  /// Check GitHub Releases for new version
+  /// Returns {version, downloadUrl} or null (no update / check failed)
   static Future<Map<String, String>?> checkForUpdate() async {
     try {
       final client = HttpClient();
@@ -294,7 +294,7 @@ class PythonProcessService {
 
       final json = jsonDecode(body) as Map<String, dynamic>;
       final latestTag = json['tag_name'] as String? ?? '';
-      // tag 格式: v1.0.0 → 去掉 v
+      // tag format: v1.0.0 -> strip v
       final latestVer =
           latestTag.startsWith('v') ? latestTag.substring(1) : latestTag;
 
@@ -320,7 +320,7 @@ class PythonProcessService {
     }
   }
 
-  /// 版本号比较：>0 表示 v1 > v2，<0 表示 v1 < v2，=0 相等
+  /// Version comparison: >0 means v1 > v2, <0 means v1 < v2, =0 means equal
   static int _compareVersion(String v1, String v2) {
     final parts1 =
         v1.split('.').map((e) => int.tryParse(e) ?? 0).toList();

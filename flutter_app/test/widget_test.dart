@@ -7,6 +7,6 @@ void main() {
     await tester.pumpWidget(const FileConverterApp());
     await tester.pump();
 
-    expect(find.text('文件转换工具'), findsOneWidget);
+    expect(find.text('File Converter'), findsOneWidget);
   });
 }

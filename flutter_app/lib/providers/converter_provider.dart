@@ -6,28 +6,28 @@ import '../models/task_progress.dart';
 import '../services/api_client.dart';
 import '../services/python_process.dart';
 
-/// 启动阶段枚举，用于 UI 显示不同提示
+/// Startup phase enum for UI display
 enum StartupPhase {
-  /// 尚未开始启动
+  /// Not yet started
   none,
 
-  /// 正在启动 Python 后端进程
+  /// Starting Python backend process
   starting,
 
-  /// 正在等待后端 HTTP 就绪
+  /// Waiting for backend HTTP ready
   awaiting,
 
-  /// 正在加载格式列表
+  /// Loading format list
   loading,
 
-  /// 启动完成，一切就绪
+  /// Startup complete, ready
   ready,
 
-  /// 启动失败
+  /// Startup failed
   failed,
 }
 
-/// 从 Exception 对象提取纯净的错误消息（去掉 "Exception: " 前缀）
+/// Extract clean error message from Exception object (strip "Exception: " prefix)
 String _extractMessage(Object e) {
   final s = e.toString();
   const prefix = 'Exception: ';
@@ -51,14 +51,14 @@ class ConverterProvider extends ChangeNotifier {
   String? _error;
   Timer? _pollTimer;
 
-  // ── 输出目录管理 ──
+  // ── Output Directory Management ──
   late String _outputDir;
   String? _outputDirError;
 
-  // 记录心跳阶段的第一个异常原因
+  // Record first heartbeat error detail
   String? _heartbeatErrorDetail;
 
-  // ── 自动更新 ──
+  // ── Auto Update ──
   bool _hasUpdate = false;
   String? _latestVersion;
   String? _downloadUrl;
@@ -77,29 +77,29 @@ class ConverterProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isConverting => _currentTask != null && !_currentTask!.isCompleted && !_currentTask!.isFailed;
 
-  /// 启动阶段对应的友好提示文字
+  /// Startup phase display message
   String get startupMessage {
     switch (_startupPhase) {
       case StartupPhase.starting:
-        return '正在启动后端服务...';
+        return 'Starting backend service...';
       case StartupPhase.awaiting:
-        return '正在等待后端就绪...';
+        return 'Waiting for backend...';
       case StartupPhase.loading:
-        return '正在加载格式列表...';
+        return 'Loading formats...';
       case StartupPhase.failed:
-        return _error ?? '后端启动失败';
+        return _error ?? 'Backend failed to start';
       case StartupPhase.ready:
       case StartupPhase.none:
         return '';
     }
   }
 
-  // ── 输出目录 Getter ──
+  // ── Output Directory Getters ──
   String get outputDir => _outputDir;
   String? get outputDirError => _outputDirError;
 
   ConverterProvider() {
-    // 默认输出目录：用户桌面
+    // Default output directory: user desktop
     _outputDir = '${Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.'}\\Desktop\\FileConverterOutput';
   }
 
@@ -122,11 +122,11 @@ class ConverterProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Phase 1: 启动 Python 后端进程
+      // Phase 1: Start Python backend process
       await _pythonService.start();
       _isInitialized = true;
 
-      // Phase 2: 等待后端 HTTP 就绪
+      // Phase 2: Wait for backend HTTP ready
       _startupPhase = StartupPhase.awaiting;
       notifyListeners();
 
@@ -144,16 +144,16 @@ class ConverterProvider extends ChangeNotifier {
 
       if (!ready) {
         final detail = _heartbeatErrorDetail != null
-            ? ' (原因: $_heartbeatErrorDetail)'
+            ? ' (reason: $_heartbeatErrorDetail)'
             : '';
-        _error = '后端服务启动失败$detail';
+        _error = 'Backend service failed to start$detail';
         _startupPhase = StartupPhase.failed;
         _isLoading = false;
         notifyListeners();
         return;
       }
 
-      // Phase 3: 加载格式列表
+      // Phase 3: Load format list
       _startupPhase = StartupPhase.loading;
       notifyListeners();
 
@@ -162,37 +162,37 @@ class ConverterProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
 
-      // 启动完成后静默检查更新
+      // Silently check for updates after startup
       _checkForUpdate();
     } catch (e) {
       _startupPhase = StartupPhase.failed;
       _isLoading = false;
-      _error = '无法加载格式列表: ${_extractMessage(e)}';
+      _error = 'Failed to load formats: ${_extractMessage(e)}';
       notifyListeners();
     }
   }
 
-  /// 选择输出目录
+  /// Select output directory
   void setOutputDir(String path) {
     _outputDir = path;
     _outputDirError = null;
     notifyListeners();
   }
 
-  /// 验证输出目录是否可写
+  /// Validate output directory is writable
   bool _validateOutputDir() {
     final dir = Directory(_outputDir);
     try {
       if (!dir.existsSync()) {
         dir.createSync(recursive: true);
       }
-      // 尝试写入一个临时文件来验证写权限
+      // Try writing a temp file to verify write permission
       final testFile = File('${dir.path}\\.write_test');
       testFile.writeAsStringSync('test');
       testFile.deleteSync();
       return true;
     } catch (e) {
-      _outputDirError = '输出目录不可写: ${_extractMessage(e)}';
+      _outputDirError = 'Output directory not writable: ${_extractMessage(e)}';
       notifyListeners();
       return false;
     }
@@ -201,24 +201,24 @@ class ConverterProvider extends ChangeNotifier {
   Future<void> startConversion() async {
     if (_selectedFile == null || _selectedFormat == null) return;
 
-    // ── 扩展名校验 ──
+    // ── Extension Validation ──
     final inferred = _selectedFile!.inferredFormat;
     if (inferred == null) {
-      _error = '不支持的文件格式: ${_selectedFile!.extension}';
+      _error = 'Unsupported file format: ${_selectedFile!.extension}';
       notifyListeners();
       return;
     }
 
-    // ── 文件存在性预检 ──
+    // ── File Existence Check ──
     if (!File(_selectedFile!.path).existsSync()) {
-      _error = '文件不存在或已被移动';
+      _error = 'File not found or has been moved';
       notifyListeners();
       return;
     }
 
-    // ── 输出目录校验 ──
+    // ── Output Directory Validation ──
     if (!_validateOutputDir()) {
-      // _validateOutputDir 已经设置了 _outputDirError
+      // _validateOutputDir already set _outputDirError
       return;
     }
 
@@ -229,13 +229,13 @@ class ConverterProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('开始转换: ${_selectedFile!.path} -> ${_selectedFormat!.value}');
+      debugPrint('Starting conversion: ${_selectedFile!.path} -> ${_selectedFormat!.value}');
       final taskId = await _apiClient.submitConversion(
         filePath: _selectedFile!.path,
         targetFormat: _selectedFormat!.value,
         outputDir: _outputDir,
       );
-      debugPrint('转换任务已提交: $taskId');
+      debugPrint('Conversion task submitted: $taskId');
 
       _currentTask = TaskProgress(
         taskId: taskId,
@@ -246,7 +246,7 @@ class ConverterProvider extends ChangeNotifier {
 
       _startPolling(taskId);
     } catch (e) {
-      debugPrint('转换失败: $e');
+      debugPrint('Conversion failed: $e');
       _isLoading = false;
       _error = _extractMessage(e);
       notifyListeners();
@@ -268,7 +268,7 @@ class ConverterProvider extends ChangeNotifier {
       } catch (e) {
         _pollTimer?.cancel();
         _pollTimer = null;
-        _error = '轮询任务状态失败';
+        _error = 'Failed to poll task status';
         notifyListeners();
       }
     });
@@ -285,15 +285,15 @@ class ConverterProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 重置并重新启动后端（用于失败后重试）
+  /// Reset and restart backend (for retry after failure)
   Future<void> retry() async {
     reset();
-    // 确保旧进程已停止
+    // Ensure old process is stopped
     await _pythonService.stop();
     await loadFormats();
   }
 
-  /// 静默检查 GitHub Releases 是否有新版本
+  /// Silently check GitHub Releases for new version
   Future<void> _checkForUpdate() async {
     try {
       final result = await PythonProcessService.checkForUpdate();
@@ -304,7 +304,7 @@ class ConverterProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (_) {
-      // 静默失败，不影响正常使用
+      // Silently fail, do not affect normal usage
     }
   }
 

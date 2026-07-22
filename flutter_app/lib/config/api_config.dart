@@ -1,5 +1,5 @@
 class ApiConfig {
-  // 初始为空，由 PythonProcessService 在启动后动态设置
+  // Initially empty, set dynamically by PythonProcessService after startup
   static String baseUrl = '';
 
   static String get healthUrl => '$baseUrl/health';

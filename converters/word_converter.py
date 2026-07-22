@@ -7,7 +7,7 @@ class WordConverter:
 
     @staticmethod
     def to_pdf(docx_path: str, pdf_path: str):
-        docx_to_pdf(docx_path, pdf_path, "Word -> PDF 需安装 MS Word (Windows) 或 LibreOffice (Linux/Mac)")
+        docx_to_pdf(docx_path, pdf_path, "Word -> PDF requires MS Word (Windows) or LibreOffice (Linux/Mac)")
 
     @staticmethod
     def to_excel(docx_path: str, xlsx_path: str):
@@ -16,7 +16,7 @@ class WordConverter:
         doc = Document(docx_path)
         wb = Workbook()
         ws = wb.active
-        ws.title = "文档内容"
+        ws.title = "Document Content"
 
         row_idx = 1
         for para in doc.paragraphs:
@@ -27,7 +27,7 @@ class WordConverter:
 
         for i, table in enumerate(doc.tables):
             row_idx += 1
-            ws.cell(row=row_idx, column=1, value=f"[表格 {i + 1}]")
+            ws.cell(row=row_idx, column=1, value=f"[Table {i+1}]")
             row_idx += 1
             for row in table.rows:
                 for j, cell in enumerate(row.cells):
@@ -57,7 +57,7 @@ class WordConverter:
             lines.append("")
 
         for i, table in enumerate(doc.tables):
-            lines.append(f"**表格 {i + 1}**\n")
+            lines.append(f"**Table {i+1}**\n")
             table_data = [[cell.text for cell in row.cells] for row in table.rows]
             if table_data:
                 header = table_data[0]

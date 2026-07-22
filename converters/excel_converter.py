@@ -30,7 +30,7 @@ class ExcelConverter:
         temp_docx = str(Path(pdf_path).with_suffix(".docx"))
         doc.save(temp_docx)
 
-        docx_to_pdf(temp_docx, pdf_path, "Excel -> PDF 需安装 MS Word (Windows) 或 LibreOffice (Linux/Mac)")
+        docx_to_pdf(temp_docx, pdf_path, "Excel -> PDF requires MS Word (Windows) or LibreOffice (Linux/Mac)")
         Path(temp_docx).unlink(missing_ok=True)
 
     @staticmethod
@@ -78,7 +78,7 @@ class ExcelConverter:
                 for row in table_data[1:]:
                     lines.append("| " + " | ".join(row) + " |")
             else:
-                lines.append("（本 Sheet 无内容）")
+                lines.append("(This sheet is empty)")
             lines.append("")
 
         Path(md_path).write_text("\n".join(lines), encoding="utf-8")

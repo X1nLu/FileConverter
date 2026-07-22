@@ -11,7 +11,7 @@ class PdfConverter:
             wb = Workbook()
             wb.remove(wb.active)
             for i, page in enumerate(pdf.pages, start=1):
-                ws = wb.create_sheet(title=f"第{i}页")
+                ws = wb.create_sheet(title=f"Page {i}")
                 row_idx = 1
 
                 found_tables = page.find_tables()
@@ -76,7 +76,7 @@ class PdfConverter:
         lines = []
         with pdfplumber.open(pdf_path) as pdf:
             for i, page in enumerate(pdf.pages, start=1):
-                lines.append(f"## 第 {i} 页\n")
+                lines.append(f"## Page {i}\n")
                 text = page.extract_text()
                 if text:
                     lines.append(text)

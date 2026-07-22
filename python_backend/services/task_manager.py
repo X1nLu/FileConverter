@@ -15,12 +15,12 @@ class Task:
 
 
 class TaskManager:
-    """线程安全的任务管理器，存储任务状态和进度。"""
+    """Thread-safe task manager for storing task status and progress."""
 
     def __init__(self):
         self._lock = threading.Lock()
         self._tasks: dict[str, Task] = {}
-        self._semaphore = threading.Semaphore(4)  # 最多 4 个并发
+        self._semaphore = threading.Semaphore(4)  # Max 4  concurrent tasks
 
     def create_task(self, total: int = 1) -> str:
         task_id = uuid.uuid4().hex[:12]
@@ -60,7 +60,7 @@ class TaskManager:
                 task.error = error
 
     def acquire_slot(self) -> bool:
-        """尝试获取并发槽位，返回是否成功。"""
+        """Try to acquire a concurrency slot, returns whether successful."""
         return self._semaphore.acquire(blocking=False)
 
     def release_slot(self):

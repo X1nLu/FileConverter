@@ -1,21 +1,21 @@
 @echo off
 chcp 65001 >nul
-title 打包 Python 后端
+title Package Python Backend
 
 echo ============================================
-echo  打包 Python 后端 - PyInstaller
+echo  Package Python Backend - PyInstaller
 echo ============================================
 
 cd /d "%~dp0"
 
-REM 检查 PyInstaller
+REM Check PyInstaller
 where pyinstaller >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     echo [Installing PyInstaller]...
     pip install pyinstaller
 )
 
-REM 清理旧构建
+REM Clean old build
 if exist "dist\backend" (
     echo [Cleaning old build]...
     rmdir /s /q "dist\backend"

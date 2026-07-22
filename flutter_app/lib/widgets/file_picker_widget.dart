@@ -5,7 +5,7 @@ import '../models/file_item.dart';
 class FilePickerWidget extends StatelessWidget {
   final FileItem? selectedFile;
   final ValueChanged<FileItem?> onFilePicked;
-  final String? sourceFormat; // 当前选中的来源格式键，用于限定文件选择范围
+  final String? sourceFormat; // Currently selected source format key, limits file picker scope
 
   const FilePickerWidget({
     super.key,
@@ -82,7 +82,7 @@ class FilePickerWidget extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          '点击选择文件',
+          'Click to select file',
           style: theme.textTheme.titleMedium?.copyWith(
             color: theme.colorScheme.primary,
             fontWeight: FontWeight.w600,
@@ -90,7 +90,7 @@ class FilePickerWidget extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '支持 PDF、Word、Excel、Markdown 格式',
+          'Supports PDF, Word, Excel, Markdown formats',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -140,7 +140,7 @@ class FilePickerWidget extends StatelessWidget {
         IconButton(
           onPressed: () => onFilePicked(null),
           icon: const Icon(Icons.close),
-          tooltip: '移除文件',
+          tooltip: 'Remove file',
         ),
       ],
     );

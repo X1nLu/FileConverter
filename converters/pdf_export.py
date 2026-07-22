@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def docx_to_pdf(docx_path: str, pdf_path: str, error_message: str):
-    """将 .docx 转为 PDF，支持 Windows Word 和 LibreOffice。"""
+    """Convert .docx to PDF, supports Windows Word and LibreOffice."""
     try:
         if sys.platform == "win32":
             import win32com.client

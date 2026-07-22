@@ -1,7 +1,7 @@
 import sys
 import os
 
-# 确保能找到项目根目录的 converters 包
+# Ensure project root converters package is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -9,10 +9,10 @@ from pathlib import Path
 from converters import REGISTRY, get_supported_conversions
 from .task_manager import TaskManager
 
-# 全局任务管理器
+# Global task manager
 task_manager = TaskManager()
 
-# 格式对应的扩展名校验集合（与旧版 Tkinter 一致）
+# Extension validation map per format
 EXT_VALID_MAP = {
     "pdf": {".pdf"},
     "xlsx": {".xlsx", ".xls"},
@@ -21,7 +21,7 @@ EXT_VALID_MAP = {
     "zip": {".zip"},
 }
 
-# 格式描述映射
+# Format description map
 EXT_DESC_MAP = {
     "pdf": "PDF",
     "xlsx": "Excel",
@@ -30,24 +30,24 @@ EXT_DESC_MAP = {
     "zip": "ZIP",
 }
 
-# 友好错误消息映射
+# Friendly error message map
 ERROR_MESSAGES = [
-    ("zipfile.BadZipFile", "ZIP 文件已损坏"),
-    ("is not a zip file", "ZIP 文件已损坏"),
-    ("No such file", "文件不存在或已被移动"),
-    ("Permission denied", "文件被占用，无法读取"),
-    ("find_html_file", "ZIP 中未找到 HTML 文件"),
-    ("pdfplumber.open", "PDF 文件已损坏或无法解析"),
-    ("load_workbook", "Excel 文件已损坏或无法解析"),
-    ("python-docx", "Word 文件已损坏或无法解析"),
-    ("Word.Application", "→PDF 需安装 Microsoft Word"),
-    ("win32com", "→PDF 需安装 Microsoft Word"),
-    ("libreoffice", "→PDF 需安装 LibreOffice"),
+    ("zipfile.BadZipFile", "ZIP file is corrupted"),
+    ("is not a zip file", "ZIP file is corrupted"),
+    ("No such file", "File not found or has been moved"),
+    ("Permission denied", "File is in use, cannot read"),
+    ("find_html_file", "No HTML file found in ZIP"),
+    ("pdfplumber.open", "PDF file is corrupted or unreadable"),
+    ("load_workbook", "Excel file is corrupted or unreadable"),
+    ("python-docx", "Word file is corrupted or unreadable"),
+    ("Word.Application", "PDF export requires Microsoft Word"),
+    ("win32com", "PDF export requires Microsoft Word"),
+    ("libreoffice", "PDF export requires LibreOffice"),
 ]
 
 
 def get_formats() -> list[dict]:
-    """返回支持的转换格式列表。"""
+    """Return supported conversion format list."""
     result = []
     seen = set()
     for src, dst in get_supported_conversions():
@@ -55,7 +55,7 @@ def get_formats() -> list[dict]:
             result.append({"ext": src, "label": EXT_DESC_MAP.get(src, src.upper())})
             seen.add(src)
         result.append({"ext": dst, "label": EXT_DESC_MAP.get(dst, dst.upper())})
-    # 去重
+    # Deduplicate
     unique = []
     seen2 = set()
     for item in result:
@@ -67,44 +67,44 @@ def get_formats() -> list[dict]:
 
 
 def friendly_error(raw: str, from_ext: str) -> str:
-    """将 Python 异常转为友好的中文提示。"""
+    """Convert Python exception to user-friendly error message."""
     for keyword, msg in ERROR_MESSAGES:
         if keyword.lower() in raw.lower():
             return msg
     fallback = {
-        "pdf": "PDF 文件无法读取，可能已损坏",
-        "xlsx": "Excel 文件无法读取，可能已损坏",
-        "docx": "Word 文件无法读取，可能已损坏",
-        "md": "Markdown 文件无法读取",
-        "zip": "ZIP 文件无法读取，可能已损坏",
+        "pdf": "PDF file cannot be read, may be corrupted",
+        "xlsx": "Excel file cannot be read, may be corrupted",
+        "docx": "Word file cannot be read, may be corrupted",
+        "md": "Markdown file cannot be read",
+        "zip": "ZIP file cannot be read, may be corrupted",
     }
-    return fallback.get(from_ext, "文件无法读取，可能已损坏")
+    return fallback.get(from_ext, "File cannot be read, may be corrupted")
 
 
 def submit_conversion(input_path: str, from_ext: str, to_ext: str, output_dir: str) -> str:
-    """提交一个转换任务，返回 task_id。"""
+    """Submit a conversion task, returns task_id."""
     fn = REGISTRY.get((from_ext, to_ext))
     if fn is None:
-        raise ValueError(f"不支持的转换: {from_ext} -> {to_ext}")
+        raise ValueError(f"Unsupported conversion: {from_ext} -> {to_ext}")
 
-    # 验证输入文件存在
+    # Verify input file exists
     if not Path(input_path).exists():
-        raise FileNotFoundError(f"文件不存在: {input_path}")
+        raise FileNotFoundError(f"File does not exist: {input_path}")
 
-    # 验证文件扩展名与来源格式匹配
+    # Verify file extension matches source format
     input_suffix = Path(input_path).suffix.lower()
     allowed_exts = EXT_VALID_MAP.get(from_ext)
     if allowed_exts and input_suffix not in allowed_exts:
         raise ValueError(
-            f"文件扩展名不匹配: 格式 '{EXT_DESC_MAP.get(from_ext, from_ext.upper())}' "
-            f"不支持 '{input_suffix}' 文件"
+            f"Extension mismatch: format '{EXT_DESC_MAP.get(from_ext, from_ext.upper())}' "
+            f"does not support '{input_suffix}' files"
         )
 
     task_id = task_manager.create_task(total=1)
 
-    # 尝试获取并发槽位
+    # Attempt to acquire concurrency slot
     if not task_manager.acquire_slot():
-        task_manager.set_failed(task_id, "系统繁忙，请稍后再试")
+        task_manager.set_failed(task_id, "System busy, please try again later")
         return task_id
 
     import threading

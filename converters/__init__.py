@@ -26,5 +26,5 @@ def get_supported_conversions():
 def convert(input_path: str, output_path: str, from_ext: str, to_ext: str):
     fn = REGISTRY.get((from_ext, to_ext))
     if fn is None:
-        raise ValueError(f"不支持的转换: {from_ext} -> {to_ext}")
+        raise ValueError(f"Unsupported conversion: {from_ext} -> {to_ext}")
     fn(input_path, output_path)

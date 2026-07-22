@@ -49,7 +49,7 @@ class ConversionProgress extends StatelessWidget {
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
         const SizedBox(width: 12),
-        Text('等待中...', style: theme.textTheme.bodyMedium),
+        Text('Waiting...', style: theme.textTheme.bodyMedium),
       ],
     );
   }
@@ -70,7 +70,7 @@ class ConversionProgress extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                '转换中... ${task.progress}/${task.total}',
+                'Converting... ${task.progress}/${task.total}',
                 style: theme.textTheme.bodyMedium,
               ),
             ),
@@ -97,7 +97,7 @@ class ConversionProgress extends StatelessWidget {
             Icon(Icons.check_circle, color: theme.colorScheme.primary, size: 24),
             const SizedBox(width: 12),
             Text(
-              '转换完成！',
+              'Conversion complete!',
               style: theme.textTheme.titleSmall?.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.w600,
@@ -142,7 +142,7 @@ class ConversionProgress extends StatelessWidget {
         if (task.resultPath != null) ...[
           const SizedBox(height: 8),
           Text(
-            '生成文件: ${task.resultPath}',
+            'Output: ${task.resultPath}',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -161,7 +161,7 @@ class ConversionProgress extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            task.error ?? '转换失败',
+            task.error ?? 'Conversion failed',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.error,
             ),
