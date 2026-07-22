@@ -24,7 +24,7 @@ class FilePickerWidget extends StatelessWidget {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: _allowedExtensions ?? ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'md'],
+      allowedExtensions: _allowedExtensions ?? ['pdf', 'docx', 'xlsx', 'md', 'markdown', 'zip'],
     );
 
     if (result != null && result.files.isNotEmpty) {
@@ -90,7 +90,7 @@ class FilePickerWidget extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Supports PDF, Word, Excel, Markdown formats',
+          'Supports PDF, Word, Excel, Markdown, ZIP (HTML) formats',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -157,7 +157,10 @@ class FilePickerWidget extends StatelessWidget {
       case '.xls':
         return Icons.table_chart;
       case '.md':
+      case '.markdown':
         return Icons.article;
+      case '.zip':
+        return Icons.folder_zip;
       default:
         return Icons.insert_drive_file;
     }

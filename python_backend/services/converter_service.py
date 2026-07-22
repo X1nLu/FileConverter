@@ -13,10 +13,12 @@ from .task_manager import TaskManager
 task_manager = TaskManager()
 
 # Extension validation map per format
+# Note: only extensions the converters can actually read are listed.
+# openpyxl cannot read .xls and python-docx cannot read .doc.
 EXT_VALID_MAP = {
     "pdf": {".pdf"},
-    "xlsx": {".xlsx", ".xls"},
-    "docx": {".docx", ".doc"},
+    "xlsx": {".xlsx"},
+    "docx": {".docx"},
     "md": {".md", ".markdown"},
     "zip": {".zip"},
 }
@@ -46,24 +48,18 @@ ERROR_MESSAGES = [
 ]
 
 
-def get_formats() -> list[dict]:
-    """Return supported conversion format list."""
-    result = []
-    seen = set()
+def get_formats() -> dict:
+    """Return supported format list and source->targets conversion map."""
+    formats: list[dict] = []
+    seen: set[str] = set()
+    conversions: dict[str, list[str]] = {}
     for src, dst in get_supported_conversions():
-        if src not in seen:
-            result.append({"ext": src, "label": EXT_DESC_MAP.get(src, src.upper())})
-            seen.add(src)
-        result.append({"ext": dst, "label": EXT_DESC_MAP.get(dst, dst.upper())})
-    # Deduplicate
-    unique = []
-    seen2 = set()
-    for item in result:
-        key = item["ext"]
-        if key not in seen2:
-            seen2.add(key)
-            unique.append(item)
-    return unique
+        conversions.setdefault(src, []).append(dst)
+        for ext in (src, dst):
+            if ext not in seen:
+                seen.add(ext)
+                formats.append({"ext": ext, "label": EXT_DESC_MAP.get(ext, ext.upper())})
+    return {"formats": formats, "conversions": conversions}
 
 
 def friendly_error(raw: str, from_ext: str) -> str:
@@ -81,7 +77,23 @@ def friendly_error(raw: str, from_ext: str) -> str:
     return fallback.get(from_ext, "File cannot be read, may be corrupted")
 
 
-def submit_conversion(input_path: str, from_ext: str, to_ext: str, output_dir: str) -> str:
+def _unique_output_path(output_dir: str, stem: str, to_ext: str) -> str:
+    """Generate a non-conflicting output path by appending _1, _2, ... if needed."""
+    candidate = Path(output_dir) / f"{stem}.{to_ext}"
+    counter = 1
+    while candidate.exists():
+        candidate = Path(output_dir) / f"{stem}_{counter}.{to_ext}"
+        counter += 1
+    return str(candidate)
+
+
+def submit_conversion(
+    input_path: str,
+    from_ext: str,
+    to_ext: str,
+    output_dir: str,
+    cleanup_input: bool = False,
+) -> str:
     """Submit a conversion task, returns task_id."""
     fn = REGISTRY.get((from_ext, to_ext))
     if fn is None:
@@ -112,7 +124,7 @@ def submit_conversion(input_path: str, from_ext: str, to_ext: str, output_dir: s
     def _run():
         try:
             task_manager.set_running(task_id)
-            output_path = str(Path(output_dir) / f"{Path(input_path).stem}.{to_ext}")
+            output_path = _unique_output_path(output_dir, Path(input_path).stem, to_ext)
             task_manager.set_progress(task_id, 0)
             fn(input_path, output_path)
             task_manager.set_completed(task_id, output_path)
@@ -120,6 +132,13 @@ def submit_conversion(input_path: str, from_ext: str, to_ext: str, output_dir: s
             task_manager.set_failed(task_id, friendly_error(str(e), from_ext))
         finally:
             task_manager.release_slot()
+            # Delete the uploaded temp copy (only for /convert uploads,
+            # never the user's original file passed via /convert_by_path)
+            if cleanup_input:
+                try:
+                    Path(input_path).unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     threading.Thread(target=_run, daemon=True).start()
     return task_id

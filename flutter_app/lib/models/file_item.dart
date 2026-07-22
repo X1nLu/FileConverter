@@ -1,8 +1,10 @@
-/// File extension whitelist: allowed extensions per source format
+/// File extension whitelist: allowed extensions per source format.
+/// Only extensions the converters can actually read are listed
+/// (openpyxl cannot read .xls, python-docx cannot read .doc).
 const extValidMap = <String, Set<String>>{
   'pdf': {'.pdf'},
-  'xlsx': {'.xlsx', '.xls'},
-  'docx': {'.docx', '.doc'},
+  'xlsx': {'.xlsx'},
+  'docx': {'.docx'},
   'md': {'.md', '.markdown'},
   'zip': {'.zip'},
 };
@@ -41,7 +43,7 @@ class FileItem {
   String get sizeFormatted {
     if (size < 1024) return '$size B';
     if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';
-    if (size < 1024 * 746 * 1024) {
+    if (size < 1024 * 1024 * 1024) {
       return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
     return '${(size / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
@@ -54,27 +56,34 @@ class FormatOption {
 
   const FormatOption({required this.label, required this.value});
 
+  // Fallback lists, kept in sync with the backend converters REGISTRY.
+  // At runtime the UI prefers the backend-reported conversion map.
   static const List<FormatOption> pdfFormats = [
-    FormatOption(label: 'Word (.docx)', value: 'docx'),
     FormatOption(label: 'Excel (.xlsx)', value: 'xlsx'),
+    FormatOption(label: 'Word (.docx)', value: 'docx'),
     FormatOption(label: 'Markdown (.md)', value: 'md'),
-    FormatOption(label: 'Image (.png)', value: 'png'),
-    FormatOption(label: 'Image (.jpg)', value: 'jpg'),
   ];
 
   static const List<FormatOption> wordFormats = [
     FormatOption(label: 'PDF (.pdf)', value: 'pdf'),
+    FormatOption(label: 'Excel (.xlsx)', value: 'xlsx'),
     FormatOption(label: 'Markdown (.md)', value: 'md'),
   ];
 
   static const List<FormatOption> excelFormats = [
     FormatOption(label: 'PDF (.pdf)', value: 'pdf'),
+    FormatOption(label: 'Word (.docx)', value: 'docx'),
     FormatOption(label: 'Markdown (.md)', value: 'md'),
   ];
 
   static const List<FormatOption> markdownFormats = [
     FormatOption(label: 'PDF (.pdf)', value: 'pdf'),
+    FormatOption(label: 'Excel (.xlsx)', value: 'xlsx'),
     FormatOption(label: 'Word (.docx)', value: 'docx'),
+  ];
+
+  static const List<FormatOption> zipFormats = [
+    FormatOption(label: 'Markdown (.md)', value: 'md'),
   ];
 
   static List<FormatOption> getFormats(String extension) {
@@ -82,13 +91,14 @@ class FormatOption {
       case '.pdf':
         return pdfFormats;
       case '.docx':
-      case '.doc':
         return wordFormats;
       case '.xlsx':
-      case '.xls':
         return excelFormats;
       case '.md':
+      case '.markdown':
         return markdownFormats;
+      case '.zip':
+        return zipFormats;
       default:
         return [];
     }

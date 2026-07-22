@@ -45,6 +45,7 @@ class ConverterProvider extends ChangeNotifier {
   FormatOption? _selectedFormat;
   TaskProgress? _currentTask;
   List<Map<String, dynamic>> _availableFormats = [];
+  Map<String, List<String>> _conversions = {};
   StartupPhase _startupPhase = StartupPhase.none;
   bool _isLoading = false;
   bool _isInitialized = false;
@@ -157,7 +158,16 @@ class ConverterProvider extends ChangeNotifier {
       _startupPhase = StartupPhase.loading;
       notifyListeners();
 
-      _availableFormats = await _apiClient.getFormats();
+      final formatsData = await _apiClient.getFormats();
+      _availableFormats =
+          (formatsData['formats'] as List?)?.cast<Map<String, dynamic>>() ??
+          [];
+      _conversions =
+          (formatsData['conversions'] as Map?)?.map(
+            (key, value) =>
+                MapEntry(key as String, (value as List).cast<String>()),
+          ) ??
+          {};
       _startupPhase = StartupPhase.ready;
       _isLoading = false;
       notifyListeners();
@@ -169,6 +179,35 @@ class ConverterProvider extends ChangeNotifier {
       _isLoading = false;
       _error = 'Failed to load formats: ${_extractMessage(e)}';
       notifyListeners();
+    }
+  }
+
+  /// Get target format options for a source file extension.
+  /// Prefers backend-reported conversions; falls back to the built-in list
+  /// when the backend data is unavailable.
+  List<FormatOption> formatsFor(String extension) {
+    final source = resolveFormatForExtension(extension);
+    final targets = source != null ? _conversions[source] : null;
+    if (targets == null || targets.isEmpty) {
+      return FormatOption.getFormats(extension);
+    }
+    return targets
+        .map((t) => FormatOption(label: _labelForTarget(t), value: t))
+        .toList();
+  }
+
+  static String _labelForTarget(String ext) {
+    switch (ext) {
+      case 'pdf':
+        return 'PDF (.pdf)';
+      case 'docx':
+        return 'Word (.docx)';
+      case 'xlsx':
+        return 'Excel (.xlsx)';
+      case 'md':
+        return 'Markdown (.md)';
+      default:
+        return ext.toUpperCase();
     }
   }
 

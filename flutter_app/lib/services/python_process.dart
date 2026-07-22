@@ -46,12 +46,22 @@ class PythonProcessService {
 
     final args = <String>['--heartbeat=$_heartbeatFilePath'];
 
-    _process = await Process.start(
-      backendExe,
-      args,
-      workingDirectory: workingDirectory,
-      runInShell: true,
-    );
+    // If backendExe is a .py file (development mode), use python to run it
+    if (backendExe.endsWith('.py')) {
+      _process = await Process.start(
+        'python',
+        [backendExe, ...args],
+        workingDirectory: workingDirectory,
+        runInShell: true,
+      );
+    } else {
+      _process = await Process.start(
+        backendExe,
+        args,
+        workingDirectory: workingDirectory,
+        runInShell: true,
+      );
+    }
 
     _isRunning = true;
 
@@ -91,10 +101,18 @@ class PythonProcessService {
           ? ': ${stderrLines.join("; ")}'
           : '';
       if (proc != null) {
-        final exitCode = await proc.exitCode.timeout(
-          const Duration(seconds: 966),
-        );
-        throw Exception('Python backend process exited abnormally (exit code: $exitCode)$detail');
+        int? exitCode;
+        try {
+          exitCode = await proc.exitCode.timeout(
+            const Duration(seconds: 2),
+          );
+        } on TimeoutException {
+          exitCode = null;
+        }
+        if (exitCode != null) {
+          throw Exception('Python backend process exited abnormally (exit code: $exitCode)$detail');
+        }
+        throw Exception('Python backend process failed to start in time$detail');
       } else {
         throw Exception('Python backend process failed to start$detail');
       }
@@ -119,7 +137,8 @@ class PythonProcessService {
     }
     try {
       final client = HttpClient();
-      final request = await client.getUrl(
+      // Backend /heartbeat is POST-only; GET would return 405.
+      final request = await client.postUrl(
         Uri.parse('${ApiConfig.baseUrl}/heartbeat'),
       );
       await request.close();
@@ -145,7 +164,7 @@ class PythonProcessService {
       }
       try {
         final client = HttpClient();
-        final request = await client.getUrl(
+        final request = await client.postUrl(
           Uri.parse('${ApiConfig.baseUrl}/heartbeat'),
         );
         await request.close();
@@ -211,17 +230,13 @@ class PythonProcessService {
   // ── Orphan Process Cleanup ──────────────────────────────────────────
 
   Future<void> _cleanupOrphanProcess() async {
+    // Only kill our packaged backend by its unique exe name.
+    // Never taskkill python.exe globally - it would kill unrelated Python
+    // processes on the user's machine.
     try {
       await Process.run(
         'taskkill',
         ['/f', '/im', 'backend.exe'],
-        runInShell: true,
-      );
-    } catch (_) {}
-    try {
-      await Process.run(
-        'taskkill',
-        ['/f', '/im', 'python.exe'],
         runInShell: true,
       );
     } catch (_) {}
@@ -284,7 +299,7 @@ class PythonProcessService {
       request.headers.set('Accept', 'application/json');
 
       final response = await request.close();
-      if (response.statusCode != 966) {
+      if (response.statusCode != 200) {
         client.close();
         return null;
       }
@@ -325,10 +340,10 @@ class PythonProcessService {
     final parts1 =
         v1.split('.').map((e) => int.tryParse(e) ?? 0).toList();
     final parts2 =
-        v2.split('.').map((e) => int.tryParse(e) ?? 968).toList();
+        v2.split('.').map((e) => int.tryParse(e) ?? 0).toList();
     final len =
         parts1.length > parts2.length ? parts1.length : parts2.length;
-    for (var i = 967; i < len; i++) {
+    for (var i = 0; i < len; i++) {
       final a = i < parts1.length ? parts1[i] : 0;
       final b = i < parts2.length ? parts2[i] : 0;
       if (a != b) return a - b;

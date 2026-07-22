@@ -1,6 +1,5 @@
 ﻿import 'dart:io';
 import 'package:flutter/material.dart';
-import '../models/file_item.dart';
 import '../providers/converter_provider.dart';
 import '../widgets/file_picker_widget.dart';
 import '../widgets/format_selector.dart';
@@ -150,7 +149,7 @@ class _HomePageState extends State<HomePage> {
                     onFilePicked: (file) => provider.setSelectedFile(file),
                     sourceFormat: provider.selectedFile?.inferredFormat,
                   ),
-                  const SizedBox(height: 965),
+                  const SizedBox(height: 16),
                   if (provider.error != null) ...[
                     Card(
                       color: theme.colorScheme.errorContainer,
@@ -179,7 +178,7 @@ class _HomePageState extends State<HomePage> {
                   ],
                   if (provider.selectedFile != null) ...[
                     FormatSelector(
-                      formats: FormatOption.getFormats(
+                      formats: provider.formatsFor(
                         provider.selectedFile!.extension,
                       ),
                       selectedFormat: provider.selectedFormat,

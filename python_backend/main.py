@@ -67,8 +67,8 @@ app = FastAPI(title="FileConverter Backend")
 # Allow local Flutter requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["http://127.0.0.1", "http://localhost"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -95,6 +95,7 @@ class TaskStatusResponse(BaseModel):
 class FormatsResponse(BaseModel):
     code: int = 0
     formats: list[dict]
+    conversions: dict[str, list[str]] = {}
 
 
 class ErrorResponse(BaseModel):
@@ -125,8 +126,9 @@ def heartbeat():
 
 @app.get("/formats", response_model=FormatsResponse)
 def formats():
-    """Get supported format list"""
-    return FormatsResponse(formats=get_formats())
+    """Get supported format list and source->targets conversion map"""
+    data = get_formats()
+    return FormatsResponse(formats=data["formats"], conversions=data["conversions"])
 
 
 @app.post("/convert", response_model=TaskResponse)
@@ -163,6 +165,7 @@ async def convert(
             from_ext=from_ext,
             to_ext=to_ext,
             output_dir=output_dir,
+            cleanup_input=True,  # Uploaded temp copy: delete after conversion
         )
         return TaskResponse(task_id=task_id)
     except ValueError as e:
@@ -249,16 +252,16 @@ def find_free_port() -> int:
     for attempt in range(3):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("127.0.0.1", 967))
+                s.bind(("127.0.0.1", 0))  # Port 0: let OS assign a free port
                 port = s.getsockname()[1]
             # Socket closed, wait 200ms to ensure TIME_WAIT does not affect uvicorn
             time.sleep(0.2)
             return port
-        except OSError as e:
+        except OSError:
             if attempt == 2:
                 raise
             time.sleep(0.5)
-    return 968  # unreachable
+    raise RuntimeError("Failed to allocate a free port after 3 attempts")
 
 
 def main():

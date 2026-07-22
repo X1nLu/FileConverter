@@ -18,13 +18,15 @@ class ApiClient {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getFormats() async {
+  /// Returns the decoded /formats response body, containing:
+  /// - 'formats': list of {ext, label}
+  /// - 'conversions': map of source ext -> list of target exts
+  Future<Map<String, dynamic>> getFormats() async {
     final response = await _client.get(Uri.parse(ApiConfig.formatsUrl));
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return (data['formats'] as List<dynamic>).cast<Map<String, dynamic>>();
+      return jsonDecode(response.body) as Map<String, dynamic>;
     }
-    return [];
+    return {};
   }
 
   /// Large file threshold: files larger than this use path-based strategy
