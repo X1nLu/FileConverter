@@ -11,20 +11,20 @@ cd /d "%~dp0"
 REM 检查 PyInstaller
 where pyinstaller >nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    echo [安装 PyInstaller]...
+    echo [Installing PyInstaller]...
     pip install pyinstaller
 )
 
 REM 清理旧构建
 if exist "dist\backend" (
-    echo [清理旧构建]...
+    echo [Cleaning old build]...
     rmdir /s /q "dist\backend"
 )
 if exist "build\pyinstaller" (
     rmdir /s /q "build\pyinstaller"
 )
 
-echo [开始打包]...
+echo [Starting PyInstaller]...
 pyinstaller ^
     --onedir ^
     --name backend ^
@@ -46,14 +46,13 @@ pyinstaller ^
     python_backend\main.py
 
 if %ERRORLEVEL% neq 0 (
-    echo [错误] 打包失败！
+    echo [ERROR] PyInstaller build failed!
     pause
     exit /b 1
 )
 
 echo ============================================
-echo  打包成功！
-echo  输出目录: dist\backend\
-echo  backend.exe 已生成
+echo  BUILD SUCCESS!
+echo  Output: dist\backend\backend.exe
 echo ============================================
 pause
