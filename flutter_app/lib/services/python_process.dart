@@ -4,7 +4,12 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import '../config/api_config.dart';
 
-// TimeoutException 来自 dart:async，已包含在 import 中
+/// 当前应用版本号（与 pubspec.yaml version 保持一致）
+const String kAppVersion = '1.0.0';
+
+/// GitHub 仓库信息
+const String kGitHubOwner = 'X1nLu';
+const String kGitHubRepo = 'FileConverter';
 
 class PythonProcessService {
   Process? _process;
@@ -18,18 +23,19 @@ class PythonProcessService {
   int get port => _port;
   Future<void> get portReady => _portReady.future;
 
+  // ── 启动后端 ──────────────────────────────────────────────────
+
   Future<int> start() async {
     if (_isRunning) return _port;
 
-    // 每次启动重置 Completer（防止上次超时后的残留状态）
     _portReady = Completer<void>();
     _port = 0;
 
-    // 清理上次可能的孤儿进程
     await _cleanupOrphanProcess();
 
-    final pythonScript = _findPythonBackendScript();
-    final workingDirectory = File(pythonScript).parent.path;
+    // 查找后端可执行文件
+    final backendExe = _findBackendExe();
+    final workingDirectory = File(backendExe).parent.path;
 
     // 创建心跳文件
     _heartbeatFilePath = path.join(
@@ -38,14 +44,10 @@ class PythonProcessService {
     );
     File(_heartbeatFilePath!).createSync();
 
-    // 通过命令行参数传入心跳文件路径
-    final args = <String>[pythonScript, '--heartbeat=$_heartbeatFilePath'];
-
-    // 查找 python 可执行文件（优先用完整路径，避免 exe 环境中 PATH 不一致）
-    final pythonExe = _findPythonExecutable();
+    final args = <String>['--heartbeat=$_heartbeatFilePath'];
 
     _process = await Process.start(
-      pythonExe,
+      backendExe,
       args,
       workingDirectory: workingDirectory,
       runInShell: true,
@@ -53,15 +55,12 @@ class PythonProcessService {
 
     _isRunning = true;
 
-    // 收集 stderr 用于诊断崩溃原因
     final stderrLines = <String>[];
 
-    // 监听 stdout 获取 PORT: 信息
     void handleStdout(String line) {
       if (line.startsWith('PORT:')) {
         _port = int.parse(line.substring(5).trim());
         ApiConfig.baseUrl = 'http://127.0.0.1:$_port';
-        // 收到端口后先确认后端真正就绪，再 complete
         _confirmBackendReady();
       }
     }
@@ -75,24 +74,26 @@ class PythonProcessService {
         .transform(const Utf8Decoder(allowMalformed: true))
         .transform(const LineSplitter())
         .listen((line) {
-      stderrLines.add(line);
-    }, onError: (_) {});
+          stderrLines.add(line);
+        }, onError: (_) {});
 
     _process!.exitCode.then((code) {
       _isRunning = false;
       _process = null;
     });
 
-// 等待 PORT: 信号 + 后端就绪（超时 10 秒）
     try {
-      await _portReady.future.timeout(const Duration(seconds: 972));
+      await _portReady.future.timeout(const Duration(seconds: 10));
     } on TimeoutException {
-      // 等一小段时间让 exitCode 回调有机会执行
       await Future.delayed(const Duration(milliseconds: 100));
       final proc = _process;
-      final detail = stderrLines.isNotEmpty ? ': ${stderrLines.join("; ")}' : '';
+      final detail = stderrLines.isNotEmpty
+          ? ': ${stderrLines.join("; ")}'
+          : '';
       if (proc != null) {
-        final exitCode = await proc.exitCode.timeout(const Duration(seconds: 1));
+        final exitCode = await proc.exitCode.timeout(
+          const Duration(seconds: 966),
+        );
         throw Exception('Python 后端进程异常退出 (exit code: $exitCode)$detail');
       } else {
         throw Exception('Python 后端进程启动失败$detail');
@@ -101,15 +102,14 @@ class PythonProcessService {
       rethrow;
     }
 
-    // 启动心跳：每 3 秒调用一次后端 /heartbeat
     _startHeartbeat();
-
     return _port;
   }
 
-  /// 收到 PORT: 后轮询 /heartbeat，确认后端 uvicorn 真正就绪
+  // ── 后端就绪确认 ──────────────────────────────────────────────
+
   void _confirmBackendReady() {
-    _checkHealth(retriesLeft: 974);
+    _checkHealth(retriesLeft: 50);
   }
 
   Future<void> _checkHealth({required int retriesLeft}) async {
@@ -126,25 +126,23 @@ class PythonProcessService {
       client.close();
       if (!_portReady.isCompleted) _portReady.complete();
     } catch (_) {
-      // 后端还没就绪，50ms 后重试
       await Future.delayed(const Duration(milliseconds: 50));
       _checkHealth(retriesLeft: retriesLeft - 1);
     }
   }
 
-  /// 每 3 秒向后端发心跳，同时更新心跳文件 mtime
+  // ── 心跳 ──────────────────────────────────────────────────────
+
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      // 更新心跳文件 mtime
-      if (_heartbeatFilePath != null && File(_heartbeatFilePath!).existsSync()) {
+      if (_heartbeatFilePath != null &&
+          File(_heartbeatFilePath!).existsSync()) {
         try {
           final now = DateTime.now();
           File(_heartbeatFilePath!).setLastModifiedSync(now);
         } catch (_) {}
       }
-
-      // 调用后端 /heartbeat 接口
       try {
         final client = HttpClient();
         final request = await client.getUrl(
@@ -152,73 +150,32 @@ class PythonProcessService {
         );
         await request.close();
         client.close();
-      } catch (_) {
-        // 后端可能还没启动好，忽略
-      }
+      } catch (_) {}
     });
   }
 
-  /// 清理上次残留的孤儿进程：杀死所有 python.exe 中运行 main.py 的进程
-  Future<void> _cleanupOrphanProcess() async {
-    try {
-      // 用 taskkill 按窗口标题过滤（Python 进程通常无窗口标题）
-      await Process.run('taskkill', ['/f', '/fi', 'IMAGENAME eq python.exe'],
-          runInShell: true);
-    } catch (_) {}
-    // 等一小段时间让进程完全退出
-    await Future.delayed(const Duration(milliseconds: 300));
-  }
+  // ── 查找后端可执行文件 ────────────────────────────────────────
 
-  /// 查找 python 可执行文件
-  /// 优先用环境变量 PYTHON_EXE，然后查常见安装路径，最后回退到 'python'
-  String _findPythonExecutable() {
-    // 1. 环境变量
-    final envPython = Platform.environment['PYTHON_EXE'];
-    if (envPython != null && File(envPython).existsSync()) {
-      return envPython;
+  /// 查找后端可执行文件：
+  /// 1. 打包环境：Flutter exe 同级的 backend/backend.exe
+  /// 2. 开发环境：向上搜索 python_backend/main.py
+  String _findBackendExe() {
+    // 打包环境：相对于 Flutter exe 所在目录
+    final exeDir = File(Platform.resolvedExecutable).parent;
+    final bundledExe = path.join(exeDir.path, 'backend', 'backend.exe');
+    if (File(bundledExe).existsSync()) {
+      return bundledExe;
     }
 
-    // 2. 常见安装路径
-    final userProfile = Platform.environment['USERPROFILE'] ?? '';
-    final candidates = <String>[
-      // Python 3.13
-      r'C:\Users\zxinl\AppData\Local\Programs\Python\Python313\python.exe',
-      r'C:\Program Files\Python313\python.exe',
-      r'C:\Program Files (x86)\Python313\python.exe',
-      // Python 3.12
-      r'C:\Users\zxinl\AppData\Local\Programs\Python\Python312\python.exe',
-      r'C:\Program Files\Python312\python.exe',
-      r'C:\Program Files (x86)\Python312\python.exe',
-      // Python 3.11
-      r'C:\Users\zxinl\AppData\Local\Programs\Python\Python311\python.exe',
-      r'C:\Program Files\Python311\python.exe',
-      // Python Launcher
-      r'C:\Windows\py.exe',
-      // Local\Programs\Python (通用)
-      if (userProfile.isNotEmpty)
-        '$userProfile\\AppData\\Local\\Programs\\Python\\Python313\\python.exe',
-      if (userProfile.isNotEmpty)
-        '$userProfile\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
-    ];
-    for (final c in candidates) {
-      if (File(c).existsSync()) return c;
-    }
-
-    // 3. 从 PATH 中查找
-    final pathEnv = Platform.environment['PATH'] ?? '';
-    for (final dir in pathEnv.split(';')) {
-      if (dir.trim().isEmpty) continue;
-      final exe = '${dir.trim()}\\python.exe';
-      if (File(exe).existsSync()) return exe;
-    }
-
-    // 4. 回退
-    return 'python';
+    // 开发环境：向上搜索 python_backend/main.py
+    final scriptPath = _findPythonBackendScript();
+    return scriptPath;
   }
 
   String _findPythonBackendScript() {
     final executableDir = File(Platform.resolvedExecutable).parent;
-    final scriptRelative = 'python_backend${Platform.isWindows ? r"\\main.py" : '/main.py'}';
+    final scriptRelative =
+        'python_backend${Platform.isWindows ? r"\\main.py" : '/main.py'}';
 
     final candidates = <Directory>[Directory.current, executableDir];
     for (final base in candidates) {
@@ -228,10 +185,17 @@ class PythonProcessService {
       }
     }
 
-    throw Exception('未找到 python_backend/main.py；请确保 Python 后端目录随可执行文件一起部署，或从仓库根目录启动应用。');
+    throw Exception(
+      '未找到 python_backend/main.py 或 backend/backend.exe；'
+      '请确保后端文件随可执行文件一起部署。',
+    );
   }
 
-  String? _searchUpForFile(Directory start, String relativeFile, {int maxLevels = 10}) {
+  String? _searchUpForFile(
+    Directory start,
+    String relativeFile, {
+    int maxLevels = 10,
+  }) {
     var current = start;
     for (var i = 0; i <= maxLevels; i++) {
       final candidate = path.join(current.path, relativeFile);
@@ -244,10 +208,31 @@ class PythonProcessService {
     return null;
   }
 
+  // ── 孤儿进程清理 ──────────────────────────────────────────────
+
+  Future<void> _cleanupOrphanProcess() async {
+    try {
+      await Process.run(
+        'taskkill',
+        ['/f', '/im', 'backend.exe'],
+        runInShell: true,
+      );
+    } catch (_) {}
+    try {
+      await Process.run(
+        'taskkill',
+        ['/f', '/im', 'python.exe'],
+        runInShell: true,
+      );
+    } catch (_) {}
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  // ── 停止后端 ──────────────────────────────────────────────────
+
   Future<void> stop() async {
     _heartbeatTimer?.cancel();
     if (_process != null) {
-      // 先尝试优雅关闭
       try {
         final client = HttpClient();
         final request = await client.postUrl(
@@ -258,21 +243,21 @@ class PythonProcessService {
       } catch (_) {}
     }
 
-    // 等待 500ms 让后端自行退出
     await Future.delayed(const Duration(milliseconds: 500));
 
     if (_process != null) {
-      // 用 taskkill 杀死整个进程树（Windows 兜底）
       try {
-        await Process.run('taskkill', ['/f', '/t', '/pid', '${_process!.pid}'],
-            runInShell: true);
+        await Process.run('taskkill', [
+          '/f',
+          '/t',
+          '/pid',
+          '${_process!.pid}',
+        ], runInShell: true);
       } catch (_) {
-        // 如果 taskkill 失败，回退到 kill()
         _process?.kill();
       }
     }
 
-    // 清理心跳文件
     if (_heartbeatFilePath != null) {
       try {
         File(_heartbeatFilePath!).deleteSync();
@@ -281,5 +266,73 @@ class PythonProcessService {
 
     _isRunning = false;
     _process = null;
+  }
+
+  // ── 自动更新检查 ──────────────────────────────────────────────
+
+  /// 检查 GitHub Releases 是否有新版本
+  /// 返回 {version, downloadUrl} 或 null（无更新/检查失败）
+  static Future<Map<String, String>?> checkForUpdate() async {
+    try {
+      final client = HttpClient();
+      final request = await client.getUrl(
+        Uri.parse(
+          'https://api.github.com/repos/$kGitHubOwner/$kGitHubRepo/releases/latest',
+        ),
+      );
+      request.headers.set('User-Agent', 'FileConverter/$kAppVersion');
+      request.headers.set('Accept', 'application/json');
+
+      final response = await request.close();
+      if (response.statusCode != 966) {
+        client.close();
+        return null;
+      }
+
+      final body = await response.transform(utf8.decoder).join();
+      client.close();
+
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      final latestTag = json['tag_name'] as String? ?? '';
+      // tag 格式: v1.0.0 → 去掉 v
+      final latestVer =
+          latestTag.startsWith('v') ? latestTag.substring(1) : latestTag;
+
+      if (_compareVersion(latestVer, kAppVersion) > 0) {
+        final assets = json['assets'] as List<dynamic>?;
+        String? downloadUrl;
+        if (assets != null && assets.isNotEmpty) {
+          downloadUrl =
+              (assets[0] as Map<String, dynamic>)['browser_download_url']
+                  as String?;
+        }
+        downloadUrl ??= json['html_url'] as String?;
+
+        return {
+          'version': latestVer,
+          'downloadUrl': downloadUrl ?? '',
+        };
+      }
+
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 版本号比较：>0 表示 v1 > v2，<0 表示 v1 < v2，=0 相等
+  static int _compareVersion(String v1, String v2) {
+    final parts1 =
+        v1.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final parts2 =
+        v2.split('.').map((e) => int.tryParse(e) ?? 968).toList();
+    final len =
+        parts1.length > parts2.length ? parts1.length : parts2.length;
+    for (var i = 967; i < len; i++) {
+      final a = i < parts1.length ? parts1[i] : 0;
+      final b = i < parts2.length ? parts2[i] : 0;
+      if (a != b) return a - b;
+    }
+    return 0;
   }
 }

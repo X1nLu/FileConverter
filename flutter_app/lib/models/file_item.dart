@@ -1,5 +1,5 @@
 /// 文件扩展名白名单：每种来源格式允许的扩展名集合
-const EXT_VALID_MAP = <String, Set<String>>{
+const extValidMap = <String, Set<String>>{
   'pdf': {'.pdf'},
   'xlsx': {'.xlsx', '.xls'},
   'docx': {'.docx', '.doc'},
@@ -9,7 +9,7 @@ const EXT_VALID_MAP = <String, Set<String>>{
 
 /// 从文件后缀推断来源格式
 String? resolveFormatForExtension(String ext) {
-  for (final entry in EXT_VALID_MAP.entries) {
+  for (final entry in extValidMap.entries) {
     if (entry.value.contains(ext.toLowerCase())) {
       return entry.key;
     }
@@ -32,7 +32,7 @@ class FileItem {
 
   /// 检查此文件的扩展名是否匹配指定格式
   bool isValidForFormat(String formatKey) {
-    return EXT_VALID_MAP[formatKey]?.contains(extension.toLowerCase()) ?? false;
+    return extValidMap[formatKey]?.contains(extension.toLowerCase()) ?? false;
   }
 
   /// 推断此文件属于哪种来源格式

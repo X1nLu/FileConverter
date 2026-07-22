@@ -20,14 +20,17 @@ class _HomePageState extends State<HomePage> {
     widget.provider.addListener(_onProviderChanged);
     widget.provider.loadFormats();
   }
+
   @override
   void dispose() {
     widget.provider.removeListener(_onProviderChanged);
     super.dispose();
   }
+
   void _onProviderChanged() {
     if (mounted) setState(() {});
   }
+
   void _openOutputDir() {
     final resultPath = widget.provider.currentTask?.resultPath;
     final dir = resultPath != null
@@ -39,16 +42,67 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _showUpdateDialog() {
+    final provider = widget.provider;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.system_update, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('New Version Available'),
+          ],
+        ),
+        content: Text(
+          'FileConverter ${provider.latestVersion} is available. '
+          'Would you like to download the update?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              final url = provider.downloadUrl;
+              if (url != null && url.isNotEmpty) {
+                Process.start('explorer', [url]);
+              }
+            },
+            child: const Text('Download'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final provider = widget.provider;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("文件转换工具"),
+        title: const Text('File Converter'),
         centerTitle: true,
+        actions: [
+          if (provider.hasUpdate)
+            IconButton(
+              onPressed: _showUpdateDialog,
+              icon: Badge(
+                label: Text(
+                  provider.latestVersion ?? '',
+                  style: const TextStyle(fontSize: 10),
+                ),
+                child: const Icon(Icons.system_update_outlined),
+              ),
+              tooltip: 'New version ${provider.latestVersion ?? ""} available',
+            ),
+        ],
       ),
-      body: provider.startupPhase == StartupPhase.starting ||
+      body:
+          provider.startupPhase == StartupPhase.starting ||
               provider.startupPhase == StartupPhase.awaiting ||
               provider.startupPhase == StartupPhase.loading
           ? Center(
@@ -62,111 +116,128 @@ class _HomePageState extends State<HomePage> {
               ),
             )
           : provider.startupPhase == StartupPhase.failed
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 48,
-                          color: theme.colorScheme.error),
-                      const SizedBox(height: 16),
-                      Text(
-                        provider.error ?? '后端启动失败',
-                        style: theme.textTheme.titleMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton.icon(
-                        onPressed: () => provider.retry(),
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('重试'),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: theme.colorScheme.error,
                   ),
-                )
+                  const SizedBox(height: 16),
+                  Text(
+                    provider.error ?? 'Backend failed to start',
+                    style: theme.textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () => provider.retry(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FilePickerWidget(
-              selectedFile: provider.selectedFile,
-              onFilePicked: (file) => provider.setSelectedFile(file),
-              sourceFormat: provider.selectedFile?.inferredFormat,
-            ),
-            const SizedBox(height: 24),
-            if (provider.error != null) ...[
-              Card(
-                color: theme.colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline,
-                          color: theme.colorScheme.onErrorContainer),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          provider.error!,
-                          style: TextStyle(
-                              color: theme.colorScheme.onErrorContainer),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FilePickerWidget(
+                    selectedFile: provider.selectedFile,
+                    onFilePicked: (file) => provider.setSelectedFile(file),
+                    sourceFormat: provider.selectedFile?.inferredFormat,
+                  ),
+                  const SizedBox(height: 965),
+                  if (provider.error != null) ...[
+                    Card(
+                      color: theme.colorScheme.errorContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                provider.error!,
+                                style: TextStyle(
+                                  color: theme.colorScheme.onErrorContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (provider.selectedFile != null) ...[
+                    FormatSelector(
+                      formats: FormatOption.getFormats(
+                        provider.selectedFile!.extension,
+                      ),
+                      selectedFormat: provider.selectedFormat,
+                      onFormatSelected: (format) =>
+                          provider.setSelectedFormat(format),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: FilledButton.icon(
+                        onPressed:
+                            provider.selectedFormat != null &&
+                                !provider.isLoading
+                            ? () => provider.startConversion()
+                            : null,
+                        icon: provider.isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.swap_horiz),
+                        label: Text(
+                          provider.isLoading
+                              ? 'Submitting...'
+                              : 'Start Conversion',
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (provider.currentTask != null) ...[
+                    const SizedBox(height: 12),
+                    ConversionProgress(
+                      task: provider.currentTask!,
+                      outputDir: provider.currentTask!.isCompleted
+                          ? provider.outputDir
+                          : null,
+                      onOpenOutputDir: _openOutputDir,
+                    ),
+                    if (provider.currentTask!.isCompleted ||
+                        provider.currentTask!.isFailed) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => provider.reset(),
+                          child: const Text('Start Over'),
                         ),
                       ),
                     ],
-                  ),
-                ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 16),
-            ],
-            if (provider.selectedFile != null) ...[
-              FormatSelector(
-                formats: FormatOption.getFormats(provider.selectedFile!.extension),
-                selectedFormat: provider.selectedFormat,
-                onFormatSelected: (format) => provider.setSelectedFormat(format),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton.icon(
-                  onPressed: provider.selectedFormat != null && !provider.isLoading
-                      ? () => provider.startConversion()
-                      : null,
-                  icon: provider.isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.swap_horiz),
-                  label: Text(provider.isLoading ? '提交中...' : '开始转换'),
-                ),
-              ),
-            ],
-            if (provider.currentTask != null) ...[
-              const SizedBox(height: 12),
-              ConversionProgress(
-                task: provider.currentTask!,
-                outputDir: provider.currentTask!.isCompleted ? provider.outputDir : null,
-                onOpenOutputDir: _openOutputDir,
-              ),
-              if (provider.currentTask!.isCompleted || provider.currentTask!.isFailed) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () => provider.reset(),
-                    child: const Text('重新开始'),
-                  ),
-                ),
-              ],
-            ],
-          ],
-        ),
-      ),
+            ),
     );
   }
 }

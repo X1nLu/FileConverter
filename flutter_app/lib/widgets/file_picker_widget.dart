@@ -16,7 +16,7 @@ class FilePickerWidget extends StatelessWidget {
 
   List<String>? get _allowedExtensions {
     if (sourceFormat == null) return null;
-    final exts = EXT_VALID_MAP[sourceFormat];
+    final exts = extValidMap[sourceFormat];
     if (exts == null) return null;
     return exts.map((e) => e.startsWith('.') ? e.substring(1) : e).toList();
   }

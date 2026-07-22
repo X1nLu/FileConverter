@@ -58,6 +58,15 @@ class ConverterProvider extends ChangeNotifier {
   // 记录心跳阶段的第一个异常原因
   String? _heartbeatErrorDetail;
 
+  // ── 自动更新 ──
+  bool _hasUpdate = false;
+  String? _latestVersion;
+  String? _downloadUrl;
+
+  bool get hasUpdate => _hasUpdate;
+  String? get latestVersion => _latestVersion;
+  String? get downloadUrl => _downloadUrl;
+
   FileItem? get selectedFile => _selectedFile;
   FormatOption? get selectedFormat => _selectedFormat;
   TaskProgress? get currentTask => _currentTask;
@@ -152,6 +161,9 @@ class ConverterProvider extends ChangeNotifier {
       _startupPhase = StartupPhase.ready;
       _isLoading = false;
       notifyListeners();
+
+      // 启动完成后静默检查更新
+      _checkForUpdate();
     } catch (e) {
       _startupPhase = StartupPhase.failed;
       _isLoading = false;
@@ -279,6 +291,21 @@ class ConverterProvider extends ChangeNotifier {
     // 确保旧进程已停止
     await _pythonService.stop();
     await loadFormats();
+  }
+
+  /// 静默检查 GitHub Releases 是否有新版本
+  Future<void> _checkForUpdate() async {
+    try {
+      final result = await PythonProcessService.checkForUpdate();
+      if (result != null) {
+        _hasUpdate = true;
+        _latestVersion = result['version'];
+        _downloadUrl = result['downloadUrl'];
+        notifyListeners();
+      }
+    } catch (_) {
+      // 静默失败，不影响正常使用
+    }
   }
 
   @override
