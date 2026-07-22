@@ -37,6 +37,16 @@ pyinstaller ^
     --hidden-import=win32com ^
     --hidden-import=win32com.client ^
     --collect-submodules=win32com ^
+    --hidden-import=pdfplumber ^
+    --hidden-import=openpyxl ^
+    --hidden-import=docx ^
+    --hidden-import=bs4 ^
+    --hidden-import=lxml ^
+    --hidden-import=pydantic ^
+    --collect-all=pdfplumber ^
+    --collect-all=openpyxl ^
+    --collect-all=docx ^
+    --collect-all=bs4 ^
     --exclude-module=tkinter ^
     --exclude-module=test ^
     --exclude-module=unittest ^
@@ -47,7 +57,6 @@ pyinstaller ^
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] PyInstaller build failed!
-    pause
     exit /b 1
 )
 
@@ -55,4 +64,5 @@ echo ============================================
 echo  BUILD SUCCESS!
 echo  Output: dist\backend\backend.exe
 echo ============================================
+if /i "%1"=="--no-pause" goto :eof
 pause

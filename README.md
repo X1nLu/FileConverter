@@ -55,7 +55,7 @@ flowchart TB
 
 Supports 13 conversion combinations:
 
-| Source \\ Target                | Excel | Word | Markdown |
+| Source\\ Target          | Excel | Word | Markdown |
 | ------------------------ | ----- | ---- | -------- |
 | **PDF**            | ✅    | ✅   | ✅       |
 | **Excel**          | —    | ✅   | ✅       |
@@ -63,7 +63,7 @@ Supports 13 conversion combinations:
 | **Markdown**       | ✅    | ✅   | —       |
 | **ZIP (HTML→MD)** | —    | —   | ✅       |
 
-> **→PDF**  conversion（Excel→PDF、Word→PDF、Markdown→PDF）Requires **Microsoft Word** or **LibreOffice** to be installed.
+> **→PDF** conversion for Excel and Word requires **Microsoft Word** or **LibreOffice**. Markdown→PDF is generated directly and does not require either application.
 >
 > **ZIP→MD**  conversion works with browser **Ctrl+S** 'Web Page Complete' format (`.htm` + `_files/` resource directory), packed as ZIP.
 
@@ -168,13 +168,13 @@ FileConverter/
 
 ## Tech Stack
 
-| Layer    | Technology                                   |
-| -------- | -------------------------------------------- |
-| Frontend | **Flutter** 3.44+ / Dart 3.12+               |
-| Backend  | **Python** 3.13+ / **FastAPI**               |
-| Comm     | HTTP REST (Multipart upload)                 |
-| PDF      | pdfplumber                                   |
-| Excel    | openpyxl                                     |
-| Word     | python-docx                                  |
-| HTML     | beautifulsoup4                               |
-| →PDF    | pywin32 / LibreOffice                        |
+| Layer    | Technology                                 |
+| -------- | ------------------------------------------ |
+| Frontend | **Flutter** 3.44+ / Dart 3.12+       |
+| Backend  | **Python** 3.13+ / **FastAPI** |
+| Comm     | HTTP REST (Multipart upload)               |
+| PDF      | pdfplumber                                 |
+| Excel    | openpyxl                                   |
+| Word     | python-docx                                |
+| HTML     | beautifulsoup4                             |
+| →PDF    | pywin32 / LibreOffice                      |
