@@ -74,11 +74,6 @@ python main.py
 
 **2. 启动 Flutter 前端**
 
-```bash
-cd flutter_app
-flutter run -d windows
-```
-
 > Flutter 会自动启动 Python 后端进程，无需手动启动。如需单独调试后端，可手动运行 `python python_backend/main.py`。
 
 ### 方式二：构建 Flutter 可执行文件

@@ -6,6 +6,27 @@ import '../models/task_progress.dart';
 import '../services/api_client.dart';
 import '../services/python_process.dart';
 
+/// 启动阶段枚举，用于 UI 显示不同提示
+enum StartupPhase {
+  /// 尚未开始启动
+  none,
+
+  /// 正在启动 Python 后端进程
+  starting,
+
+  /// 正在等待后端 HTTP 就绪
+  awaiting,
+
+  /// 正在加载格式列表
+  loading,
+
+  /// 启动完成，一切就绪
+  ready,
+
+  /// 启动失败
+  failed,
+}
+
 /// 从 Exception 对象提取纯净的错误消息（去掉 "Exception: " 前缀）
 String _extractMessage(Object e) {
   final s = e.toString();
@@ -24,6 +45,7 @@ class ConverterProvider extends ChangeNotifier {
   FormatOption? _selectedFormat;
   TaskProgress? _currentTask;
   List<Map<String, dynamic>> _availableFormats = [];
+  StartupPhase _startupPhase = StartupPhase.none;
   bool _isLoading = false;
   bool _isInitialized = false;
   String? _error;
@@ -40,10 +62,28 @@ class ConverterProvider extends ChangeNotifier {
   FormatOption? get selectedFormat => _selectedFormat;
   TaskProgress? get currentTask => _currentTask;
   List<Map<String, dynamic>> get availableFormats => _availableFormats;
+  StartupPhase get startupPhase => _startupPhase;
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
   String? get error => _error;
   bool get isConverting => _currentTask != null && !_currentTask!.isCompleted && !_currentTask!.isFailed;
+
+  /// 启动阶段对应的友好提示文字
+  String get startupMessage {
+    switch (_startupPhase) {
+      case StartupPhase.starting:
+        return '正在启动后端服务...';
+      case StartupPhase.awaiting:
+        return '正在等待后端就绪...';
+      case StartupPhase.loading:
+        return '正在加载格式列表...';
+      case StartupPhase.failed:
+        return _error ?? '后端启动失败';
+      case StartupPhase.ready:
+      case StartupPhase.none:
+        return '';
+    }
+  }
 
   // ── 输出目录 Getter ──
   String get outputDir => _outputDir;
@@ -68,23 +108,26 @@ class ConverterProvider extends ChangeNotifier {
   }
 
   Future<void> loadFormats() async {
+    _startupPhase = StartupPhase.starting;
     _isLoading = true;
     notifyListeners();
 
     try {
-      // 先启动 Python 后端
+      // Phase 1: 启动 Python 后端进程
       await _pythonService.start();
       _isInitialized = true;
 
-      // 等待后端就绪，记录心跳异常
+      // Phase 2: 等待后端 HTTP 就绪
+      _startupPhase = StartupPhase.awaiting;
+      notifyListeners();
+
       _heartbeatErrorDetail = null;
       bool ready = false;
-      for (int i = 0; i < 30; i++) {
+      for (int i = 0; i < 20; i++) {
         try {
           ready = await _apiClient.checkHealth();
           if (ready) break;
         } catch (e) {
-          // 保留第一次遇到的异常原因
           _heartbeatErrorDetail ??= _extractMessage(e);
         }
         await Future.delayed(const Duration(milliseconds: 500));
@@ -95,15 +138,22 @@ class ConverterProvider extends ChangeNotifier {
             ? ' (原因: $_heartbeatErrorDetail)'
             : '';
         _error = '后端服务启动失败$detail';
+        _startupPhase = StartupPhase.failed;
         _isLoading = false;
         notifyListeners();
         return;
       }
 
+      // Phase 3: 加载格式列表
+      _startupPhase = StartupPhase.loading;
+      notifyListeners();
+
       _availableFormats = await _apiClient.getFormats();
+      _startupPhase = StartupPhase.ready;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
+      _startupPhase = StartupPhase.failed;
       _isLoading = false;
       _error = '无法加载格式列表: ${_extractMessage(e)}';
       notifyListeners();
@@ -217,7 +267,18 @@ class ConverterProvider extends ChangeNotifier {
     _pollTimer = null;
     _currentTask = null;
     _error = null;
+    _startupPhase = StartupPhase.none;
+    _isInitialized = false;
+    _isLoading = false;
     notifyListeners();
+  }
+
+  /// 重置并重新启动后端（用于失败后重试）
+  Future<void> retry() async {
+    reset();
+    // 确保旧进程已停止
+    await _pythonService.stop();
+    await loadFormats();
   }
 
   @override

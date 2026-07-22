@@ -14,13 +14,29 @@ class FileConverterApp extends StatefulWidget {
   State<FileConverterApp> createState() => _FileConverterAppState();
 }
 
-class _FileConverterAppState extends State<FileConverterApp> {
+class _FileConverterAppState extends State<FileConverterApp>
+    with WidgetsBindingObserver {
   final ConverterProvider _provider = ConverterProvider();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _provider.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      // 窗口关闭时确保杀死子进程
+      _provider.dispose();
+    }
   }
 
   @override

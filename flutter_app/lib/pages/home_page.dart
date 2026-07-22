@@ -48,17 +48,42 @@ class _HomePageState extends State<HomePage> {
         title: const Text("文件转换工具"),
         centerTitle: true,
       ),
-      body: provider.isLoading && !provider.isInitialized
-          ? const Center(
+      body: provider.startupPhase == StartupPhase.starting ||
+              provider.startupPhase == StartupPhase.awaiting ||
+              provider.startupPhase == StartupPhase.loading
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('正在启动后端服务...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(provider.startupMessage),
                 ],
               ),
             )
+          : provider.startupPhase == StartupPhase.failed
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 48,
+                          color: theme.colorScheme.error),
+                      const SizedBox(height: 16),
+                      Text(
+                        provider.error ?? '后端启动失败',
+                        style: theme.textTheme.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton.icon(
+                        onPressed: () => provider.retry(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('重试'),
+                      ),
+                    ],
+                  ),
+                )
           : SingleChildScrollView(
         padding: const EdgeInsets.all(12),
         child: Column(

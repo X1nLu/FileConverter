@@ -27,7 +27,35 @@ class ApiClient {
     return [];
   }
 
+  /// 大文件阈值：超过此大小走路径直读策略
+  static const int largeFileThreshold = 10 * 1024 * 1024; // 10MB
+
+  /// 根据文件大小自动选择上传策略
   Future<String> submitConversion({
+    required String filePath,
+    required String targetFormat,
+    required String outputDir,
+  }) async {
+    final file = File(filePath);
+    final size = await file.length();
+
+    if (size > largeFileThreshold) {
+      return submitConversionByPath(
+        filePath: filePath,
+        targetFormat: targetFormat,
+        outputDir: outputDir,
+      );
+    } else {
+      return submitConversionMultipart(
+        filePath: filePath,
+        targetFormat: targetFormat,
+        outputDir: outputDir,
+      );
+    }
+  }
+
+  /// 小文件：HTTP multipart 上传
+  Future<String> submitConversionMultipart({
     required String filePath,
     required String targetFormat,
     required String outputDir,
@@ -48,8 +76,40 @@ class ApiClient {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return data['task_id'] as String;
     } else {
-      // 从后端 JSON 中提取 detail 或 error 字段
-      // 避免以 Exception() 包装后产生 "Exception: " 前缀
+      String message;
+      try {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        message = (data['detail'] ?? data['error'] ?? 'Conversion failed') as String;
+      } catch (_) {
+        message = response.reasonPhrase ?? 'Conversion failed';
+      }
+      throw Exception(message);
+    }
+  }
+
+  /// 大文件：传绝对路径让 Python 直接读磁盘
+  Future<String> submitConversionByPath({
+    required String filePath,
+    required String targetFormat,
+    required String outputDir,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(ApiConfig.convertByPathUrl),
+    );
+    request.fields['input_path'] = filePath;
+    request.fields['target_format'] = targetFormat;
+    request.fields['output_dir'] = outputDir;
+
+    final streamedResponse = await request.send().timeout(
+      const Duration(seconds: 10),
+    );
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data['task_id'] as String;
+    } else {
       String message;
       try {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
