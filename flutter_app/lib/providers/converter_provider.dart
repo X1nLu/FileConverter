@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/file_item.dart';
 import '../models/task_progress.dart';
 import '../services/api_client.dart';
@@ -100,8 +101,29 @@ class ConverterProvider extends ChangeNotifier {
   String? get outputDirError => _outputDirError;
 
   ConverterProvider() {
-    // Default output directory: user desktop
-    _outputDir = '${Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.'}\\Desktop\\FileConverterOutput';
+    // Default output directory: user desktop. Overridden by the persisted
+    // user choice once _restoreOutputDir completes.
+    _outputDir = _defaultOutputDir;
+    _restoreOutputDir();
+  }
+
+  static String get _defaultOutputDir =>
+      '${Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.'}\\Desktop\\FileConverterOutput';
+
+  /// Restore the user's previously chosen output directory, if any.
+  /// The directory does not need to exist yet - it is created on demand
+  /// by _validateOutputDir before each conversion.
+  Future<void> _restoreOutputDir() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('output_dir');
+      if (saved != null && saved.isNotEmpty) {
+        _outputDir = saved;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Persistence is best-effort; fall back to the default directory
+    }
   }
 
   void setSelectedFile(FileItem? file) {
@@ -211,11 +233,14 @@ class ConverterProvider extends ChangeNotifier {
     }
   }
 
-  /// Select output directory
+  /// Select output directory and persist the choice across restarts
   void setOutputDir(String path) {
     _outputDir = path;
     _outputDirError = null;
     notifyListeners();
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setString('output_dir', path),
+    );
   }
 
   /// Validate output directory is writable

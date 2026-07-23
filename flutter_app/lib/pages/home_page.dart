@@ -1,4 +1,5 @@
 ﻿import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../providers/converter_provider.dart';
 import '../widgets/file_picker_widget.dart';
@@ -28,6 +29,65 @@ class _HomePageState extends State<HomePage> {
 
   void _onProviderChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _pickOutputDirectory() async {
+    final result = await FilePicker.platform.getDirectoryPath();
+    if (result != null) {
+      widget.provider.setOutputDir(result);
+    }
+  }
+
+  Widget _buildOutputDirSection(ThemeData theme, ConverterProvider provider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Output Directory',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Icon(
+              Icons.folder_outlined,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Tooltip(
+                message: provider.outputDir,
+                child: Text(
+                  provider.outputDir,
+                  style: theme.textTheme.bodyMedium,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: _pickOutputDirectory,
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('Change'),
+            ),
+          ],
+        ),
+        if (provider.outputDirError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              provider.outputDirError!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   void _openOutputDir() {
@@ -149,6 +209,10 @@ class _HomePageState extends State<HomePage> {
                     onFilePicked: (file) => provider.setSelectedFile(file),
                     sourceFormat: provider.selectedFile?.inferredFormat,
                   ),
+                  const SizedBox(height: 16),
+                  // Output directory: always visible so users can change
+                  // the save location before converting
+                  _buildOutputDirSection(theme, provider),
                   const SizedBox(height: 16),
                   if (provider.error != null) ...[
                     Card(
