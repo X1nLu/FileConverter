@@ -11,20 +11,20 @@ output/
 venv/
 env/
 
-# 项目临时文件
+
 *.zip
 *.rar
 take_shot.py
 screenshot.png
 
-# 构建日志与产物
+
 *.log
 installer/*.exe
 
-# 后端上传/输出临时目录
+
 python_backend/temp/
 
-# 本地工具与编辑器目录
+
 .claude/
 .vscode/
-.meituan-catpaw/
+.meituan-catpaw/AGENTS.md

@@ -1,6 +1,6 @@
 # FileConverter
 
-A lightweight Windows desktop tool for converting between PDF, Excel, Word, and Markdown formats, plus **ZIP-packed HTML pages → Markdown** conversion.
+A cross-platform desktop tool for converting between PDF, Excel, Word, and Markdown formats, plus **ZIP-packed HTML pages → Markdown** conversion. Supports **Windows / Linux / macOS**.
 
 Built with **Flutter frontend + Python FastAPI backend** architecture — Flutter handles UI, Python handles core conversion logic.
 
@@ -80,14 +80,15 @@ Run both frontend and backend.
 ```bash
 pip install -r requirements.txt
 cd python_backend
-python main.py
+python main.py        # Windows
+python3 main.py       # Linux/macOS
 ```
 
 **2. Start Flutter Frontend**
 
-> Flutter automatically starts the Python backend process. To debug the backend separately, run `python python_backend/main.py` manually.
+> Flutter automatically starts the Python backend process. To debug the backend separately, run `python python_backend/main.py` (Windows) or `python3 python_backend/main.py` (Linux/macOS) manually.
 
-### Option 2: Build Distributable Installer
+### Option 2: Build Distributable (Windows)
 
 Use the one-click build script to package Python backend, build Flutter frontend, and generate Inno Setup installer.
 
@@ -103,7 +104,26 @@ Build artifacts:
 
 > The installer places files in `Program Files\FileConverter` and creates a Start Menu shortcut. The backend is packaged as a standalone exe — **no Python installation required**.
 
-### Option 3: Step-by-Step Build
+### Option 3: Build Distributable (Linux/macOS)
+
+```bash
+# One-click build
+bash build_all.sh
+
+# Or step-by-step:
+# 1. Package Python backend
+bash build_backend.sh
+
+# 2. Build Flutter frontend
+cd flutter_app
+flutter build linux --release   # Linux
+flutter build macos --release   # macOS
+
+# 3. Package as tar.gz
+# Output: dist/FileConverter-*.tar.gz
+```
+
+### Option 4: Step-by-Step Build (Windows)
 
 ```bash
 # 1. Package Python backend
@@ -157,10 +177,12 @@ FileConverter/
 │   ├── html_converter.py       # ZIP (HTML) input converter
 │   └── pdf_export.py           # Unified docx -> PDF export
 ├── requirements.txt            # Python dependencies
-├── build_backend.bat           # PyInstaller backend packaging
-├── build_all.bat               # One-click build script
+├── build_backend.bat           # PyInstaller backend packaging (Windows)
+├── build_backend.sh            # PyInstaller backend packaging (Linux/macOS)
+├── build_all.bat               # One-click build script (Windows)
+├── build_all.sh                # One-click build script (Linux/macOS)
 ├── installer/
-│   └── FileConverter.iss       # Inno Setup installer script
+│   └── FileConverter.iss       # Inno Setup installer script (Windows)
 └── README.md                   # Project documentation
 ```
 
@@ -168,13 +190,14 @@ FileConverter/
 
 ## Tech Stack
 
-| Layer    | Technology                                 |
-| -------- | ------------------------------------------ |
-| Frontend | **Flutter** 3.44+ / Dart 3.12+       |
-| Backend  | **Python** 3.13+ / **FastAPI** |
-| Comm     | HTTP REST (Multipart upload)               |
-| PDF      | pdfplumber                                 |
-| Excel    | openpyxl                                   |
-| Word     | python-docx                                |
-| HTML     | beautifulsoup4                             |
-| →PDF    | pywin32 / LibreOffice                      |
+| Layer        | Technology                                 |
+| ------------ | ------------------------------------------ |
+| Frontend     | **Flutter** 3.442+ / Dart 3.12+           |
+| Backend      | **Python** 3.13+ / **FastAPI**             |
+| Comm         | HTTP REST (Multipart upload)               |
+| PDF          | pdfplumber                                 |
+| Excel        | openpyxl                                   |
+| Word         | python-docx                                |
+| HTML         | beautifulsoup4                             |
+| →PDF        | pywin32 (Windows) / LibreOffice / ReportLab |
+| Platform     | Windows, Linux, macOS                      |
