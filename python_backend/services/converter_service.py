@@ -87,6 +87,13 @@ def _unique_output_path(output_dir: str, stem: str, to_ext: str) -> str:
     return str(candidate)
 
 
+def _make_on_progress(task_id: str):
+    """Create an on_progress callback that updates task progress via TaskManager."""
+    def on_progress(done: int, total: int):
+        task_manager.set_progress_total(task_id, done, total)
+    return on_progress
+
+
 def submit_conversion(
     input_path: str,
     from_ext: str,
@@ -125,8 +132,10 @@ def submit_conversion(
         try:
             task_manager.set_running(task_id)
             output_path = _unique_output_path(output_dir, Path(input_path).stem, to_ext)
-            task_manager.set_progress(task_id, 0)
-            fn(input_path, output_path)
+            on_progress = _make_on_progress(task_id)
+            # Report initial progress
+            on_progress(0, 1)
+            fn(input_path, output_path, on_progress=on_progress)
             task_manager.set_completed(task_id, output_path)
         except Exception as e:
             task_manager.set_failed(task_id, friendly_error(str(e), from_ext))

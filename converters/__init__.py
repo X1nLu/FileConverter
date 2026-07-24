@@ -23,8 +23,8 @@ REGISTRY = {
 def get_supported_conversions():
     return list(REGISTRY.keys())
 
-def convert(input_path: str, output_path: str, from_ext: str, to_ext: str):
+def convert(input_path: str, output_path: str, from_ext: str, to_ext: str, **kwargs):
     fn = REGISTRY.get((from_ext, to_ext))
     if fn is None:
         raise ValueError(f"Unsupported conversion: {from_ext} -> {to_ext}")
-    fn(input_path, output_path)
+    fn(input_path, output_path, **kwargs)

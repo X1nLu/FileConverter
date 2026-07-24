@@ -22,7 +22,7 @@ class HtmlConverter:
     }
 
     @staticmethod
-    def to_markdown(zip_path: str, md_path: str):
+    def to_markdown(zip_path: str, md_path: str, on_progress=None):
         """Convert HTML from ZIP package to Markdown."""
         md_path = Path(md_path)
         md_path.parent.mkdir(parents=True, exist_ok=True)

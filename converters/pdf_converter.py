@@ -1,13 +1,15 @@
 import pdfplumber
 from openpyxl import Workbook
 from pathlib import Path
+from typing import Callable, Optional
 
 
 class PdfConverter:
 
     @staticmethod
-    def to_excel(pdf_path: str, excel_path: str):
+    def to_excel(pdf_path: str, excel_path: str, on_progress: Optional[Callable[[int, int], None]] = None):
         with pdfplumber.open(pdf_path) as pdf:
+            total_pages = len(pdf.pages)
             wb = Workbook()
             wb.remove(wb.active)
             for i, page in enumerate(pdf.pages, start=1):
@@ -39,16 +41,20 @@ class PdfConverter:
                         row_idx += 1
                     row_idx += 1
 
+                if on_progress:
+                    on_progress(i, total_pages)
+
             wb.save(excel_path)
 
     @staticmethod
-    def to_word(pdf_path: str, docx_path: str):
+    def to_word(pdf_path: str, docx_path: str, on_progress: Optional[Callable[[int, int], None]] = None):
         from docx import Document
         from docx.shared import Pt
 
         doc = Document()
         with pdfplumber.open(pdf_path) as pdf:
-            for page in pdf.pages:
+            total_pages = len(pdf.pages)
+            for idx, page in enumerate(pdf.pages, start=1):
                 text = page.extract_text()
                 if text:
                     p = doc.add_paragraph(text)
@@ -69,12 +75,16 @@ class PdfConverter:
 
                 doc.add_paragraph()
 
+                if on_progress:
+                    on_progress(idx, total_pages)
+
         doc.save(docx_path)
 
     @staticmethod
-    def to_markdown(pdf_path: str, md_path: str):
+    def to_markdown(pdf_path: str, md_path: str, on_progress: Optional[Callable[[int, int], None]] = None):
         lines = []
         with pdfplumber.open(pdf_path) as pdf:
+            total_pages = len(pdf.pages)
             for i, page in enumerate(pdf.pages, start=1):
                 lines.append(f"## Page {i}\n")
                 text = page.extract_text()
@@ -92,5 +102,8 @@ class PdfConverter:
                     for row in table_data[1:]:
                         lines.append("| " + " | ".join(str(c) if c else "" for c in row) + " |")
                     lines.append("")
+
+                if on_progress:
+                    on_progress(i, total_pages)
 
         Path(md_path).write_text("\n".join(lines), encoding="utf-8")

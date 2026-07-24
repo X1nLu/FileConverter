@@ -74,11 +74,15 @@ def _markdown_to_pdf(md_path: str, pdf_path: str):
 class MarkdownConverter:
 
     @staticmethod
-    def to_pdf(md_path: str, pdf_path: str):
+    def to_pdf(md_path: str, pdf_path: str, on_progress=None):
+        if on_progress:
+            on_progress(0, 1)
         _markdown_to_pdf(md_path, pdf_path)
+        if on_progress:
+            on_progress(1, 1)
 
     @staticmethod
-    def to_excel(md_path: str, xlsx_path: str):
+    def to_excel(md_path: str, xlsx_path: str, on_progress=None):
         from openpyxl import Workbook
 
         wb = Workbook()
@@ -86,9 +90,11 @@ class MarkdownConverter:
         ws.title = "Markdown Content"
 
         text = Path(md_path).read_text(encoding="utf-8")
+        lines = text.split("\n")
+        total_lines = len(lines)
         row_idx = 1
 
-        for line in text.split("\n"):
+        for idx, line in enumerate(lines, start=1):
             stripped = line.strip()
             if stripped.startswith("|") and stripped.endswith("|"):
                 cells = [c.strip() for c in stripped.strip("|").split("|")]
@@ -100,17 +106,22 @@ class MarkdownConverter:
                 ws.cell(row=row_idx, column=1, value=stripped)
                 row_idx += 1
 
+            if on_progress:
+                on_progress(idx, total_lines)
+
         wb.save(xlsx_path)
 
     @staticmethod
-    def to_word(md_path: str, docx_path: str):
+    def to_word(md_path: str, docx_path: str, on_progress=None):
         from docx import Document
         from docx.shared import Pt
 
         doc = Document()
         text = Path(md_path).read_text(encoding="utf-8")
+        lines = text.split("\n")
+        total_lines = len(lines)
 
-        for line in text.split("\n"):
+        for idx, line in enumerate(lines, start=1):
             stripped = line.strip()
             if stripped.startswith("## "):
                 doc.add_heading(stripped[3:], level=2)
@@ -124,5 +135,8 @@ class MarkdownConverter:
                 p = doc.add_paragraph(stripped)
                 for run in p.runs:
                     run.font.size = Pt(10)
+
+            if on_progress:
+                on_progress(idx, total_lines)
 
         doc.save(docx_path)

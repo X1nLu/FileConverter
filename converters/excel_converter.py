@@ -1,18 +1,21 @@
 from pathlib import Path
 from openpyxl import load_workbook
+from typing import Callable, Optional
 from .pdf_export import docx_to_pdf
 
 
 class ExcelConverter:
 
     @staticmethod
-    def to_pdf(xlsx_path: str, pdf_path: str):
+    def to_pdf(xlsx_path: str, pdf_path: str, on_progress: Optional[Callable[[int, int], None]] = None):
         from docx import Document
 
         wb = load_workbook(xlsx_path)
+        sheets = wb.worksheets
+        total_sheets = len(sheets)
         doc = Document()
 
-        for ws in wb.worksheets:
+        for idx, ws in enumerate(sheets, start=1):
             doc.add_heading(ws.title, level=2)
             table_data = []
             for row in ws.iter_rows(values_only=True):
@@ -27,21 +30,33 @@ class ExcelConverter:
 
             doc.add_paragraph()
 
+            if on_progress:
+                # Phase 1: generating docx (half of total)
+                on_progress(idx, total_sheets * 2)
+
         temp_docx = str(Path(pdf_path).with_suffix(".docx"))
         doc.save(temp_docx)
 
+        if on_progress:
+            on_progress(total_sheets, total_sheets * 2)
+
         docx_to_pdf(temp_docx, pdf_path, "Excel -> PDF requires MS Word (Windows) or LibreOffice (Linux/Mac)")
+
+        if on_progress:
+            on_progress(total_sheets * 2, total_sheets * 2)
+
         Path(temp_docx).unlink(missing_ok=True)
 
     @staticmethod
-    def to_word(xlsx_path: str, docx_path: str):
+    def to_word(xlsx_path: str, docx_path: str, on_progress: Optional[Callable[[int, int], None]] = None):
         from docx import Document
         from docx.shared import Inches, Pt
 
         wb = load_workbook(xlsx_path)
+        sheets = wb.worksheets
         doc = Document()
 
-        for ws in wb.worksheets:
+        for idx, ws in enumerate(sheets, start=1):
             doc.add_heading(ws.title, level=2)
             table_data = []
             column_widths = []
@@ -58,14 +73,18 @@ class ExcelConverter:
                             table.cell(i, j).text = cell_val
                 doc.add_paragraph()
 
+            if on_progress:
+                on_progress(idx, len(sheets))
+
         doc.save(docx_path)
 
     @staticmethod
-    def to_markdown(xlsx_path: str, md_path: str):
+    def to_markdown(xlsx_path: str, md_path: str, on_progress: Optional[Callable[[int, int], None]] = None):
         wb = load_workbook(xlsx_path)
+        sheets = wb.worksheets
         lines = []
 
-        for ws in wb.worksheets:
+        for idx, ws in enumerate(sheets, start=1):
             lines.append(f"## {ws.title}\n")
             table_data = []
             for row in ws.iter_rows(values_only=True):
@@ -80,5 +99,8 @@ class ExcelConverter:
             else:
                 lines.append("(This sheet is empty)")
             lines.append("")
+
+            if on_progress:
+                on_progress(idx, len(sheets))
 
         Path(md_path).write_text("\n".join(lines), encoding="utf-8")

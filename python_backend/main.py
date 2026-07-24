@@ -3,6 +3,7 @@ FileConverter - Python Backend Service
 FastAPI + Uvicorn, auto port allocation, outputs PORT:xxxx via stdout
 """
 
+import asyncio
 import os
 import sys
 import socket
@@ -22,10 +23,12 @@ from services.converter_service import get_formats, submit_conversion, task_mana
 # ── Heartbeat / Self-Daemon ──────────────────────────────────────────
 _heartbeat_file: str | None = None
 _shutdown_requested = False
+_server: uvicorn.Server | None = None
 
 
 def start_heartbeat_watchdog(heartbeat_path: str, timeout: float = 8.0):
     """Start heartbeat watchdog: exit if heartbeat file not updated within timeout seconds."""
+    global _heartbeat_file
     _heartbeat_file = heartbeat_path
 
     def _watch():
@@ -228,6 +231,19 @@ def task_status(task_id: str):
     )
 
 
+@app.post("/shutdown")
+def shutdown():
+    """Graceful shutdown endpoint — called by Flutter before process kill."""
+    global _shutdown_requested
+    _shutdown_requested = True
+
+    # Signal uvicorn to exit gracefully
+    if _server is not None:
+        _server.should_exit = True
+
+    return {"status": "shutting_down"}
+
+
 # ── Global Exception Handler ─────────────────────────────────────────
 
 @app.exception_handler(Exception)
@@ -265,6 +281,7 @@ def find_free_port() -> int:
 
 
 def main():
+    global _server
     port = find_free_port()
 
     # Heartbeat file path (passed by Flutter via command line argument)
@@ -277,7 +294,11 @@ def main():
 
     # Tell Flutter the port number via stdout
     print(f"PORT:{port}", flush=True)
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+
+    # Use uvicorn.Server for graceful shutdown support
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    _server = uvicorn.Server(config)
+    _server.run()
 
 
 if __name__ == "__main__":
