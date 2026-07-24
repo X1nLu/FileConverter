@@ -46,10 +46,11 @@ class PythonProcessService {
 
     final args = <String>['--heartbeat=$_heartbeatFilePath'];
 
-    // If backendExe is a .py file (development mode), use python to run it
+    // If backendExe is a .py file (development mode), use python/python3 to run it
     if (backendExe.endsWith('.py')) {
+      final pythonCmd = Platform.isWindows ? 'python' : 'python3';
       _process = await Process.start(
-        'python',
+        pythonCmd,
         [backendExe, ...args],
         workingDirectory: workingDirectory,
         runInShell: true,
@@ -176,12 +177,13 @@ class PythonProcessService {
   // ── Find Backend Executable ────────────────────────────────────────
 
   /// Find backend executable：
-  /// 1. Packaged: backend/backend.exe next to Flutter exe
+  /// 1. Packaged: backend/backend(.exe) next to Flutter exe
   /// 2. Development: search up for python_backend/main.py
   String _findBackendExe() {
     // Packaged: relative to Flutter exe directory
     final exeDir = File(Platform.resolvedExecutable).parent;
-    final bundledExe = path.join(exeDir.path, 'backend', 'backend.exe');
+    final exeName = Platform.isWindows ? 'backend.exe' : 'backend';
+    final bundledExe = path.join(exeDir.path, 'backend', exeName);
     if (File(bundledExe).existsSync()) {
       return bundledExe;
     }
@@ -234,13 +236,21 @@ class PythonProcessService {
     // Never taskkill python.exe globally - it would kill unrelated Python
     // processes on the user's machine.
     try {
-      await Process.run(
-        'taskkill',
-        ['/f', '/im', 'backend.exe'],
-        runInShell: true,
-      );
+      if (Platform.isWindows) {
+        await Process.run(
+          'taskkill',
+          ['/f', '/im', 'backend.exe'],
+          runInShell: true,
+        );
+      } else {
+        await Process.run(
+          'pkill',
+          ['-f', 'backend'],
+          runInShell: true,
+        );
+      }
     } catch (_) {}
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 650));
   }
 
   // ── Stop Backend ────────────────────────────────────────────────────
@@ -262,12 +272,20 @@ class PythonProcessService {
 
     if (_process != null) {
       try {
-        await Process.run('taskkill', [
-          '/f',
-          '/t',
-          '/pid',
-          '${_process!.pid}',
-        ], runInShell: true);
+        if (Platform.isWindows) {
+          await Process.run('taskkill', [
+            '/f',
+            '/t',
+            '/pid',
+            '${_process!.pid}',
+          ], runInShell: true);
+        } else {
+          _process!.kill(ProcessSignal.sigterm);
+          await Future.delayed(const Duration(milliseconds: 300));
+          if (_process != null) {
+            _process!.kill(ProcessSignal.sigkill);
+          }
+        }
       } catch (_) {
         _process?.kill();
       }

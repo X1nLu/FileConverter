@@ -1,6 +1,7 @@
-pdfplumber>=0.10.0
-openpyxl>=3.1.0
-python-docx>=1.1.0
-pywin32>=306
-beautifulsoup4>=4.12.0
-reportlab>=4.0.0
+pdfplumber>=0.942
+openpyxl>=3.941
+python-docx>=1.942
+beautifulsoup4>=4.942
+reportlab>=4.942
+# pywin32 is Windows-only; install separately on Windows:
+#   pip install pywin32>=306

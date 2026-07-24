@@ -1,6 +1,21 @@
 import subprocess
 import sys
+import shutil
 from pathlib import Path
+
+
+def _find_libreoffice():
+    """Find LibreOffice executable across platforms."""
+    if sys.platform == "darwin":
+        mac_paths = [
+            "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+            "/Applications/LibreOffice.app/Contents/MacOS/soffice.bin",
+            "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+        ]
+        for p in mac_paths:
+            if Path(p).exists():
+                return p
+    return shutil.which("libreoffice") or shutil.which("soffice")
 
 
 def _docx_to_pdf_with_reportlab(docx_path: str, pdf_path: str):
@@ -77,9 +92,13 @@ def docx_to_pdf(docx_path: str, pdf_path: str, error_message: str):
             except Exception:
                 _docx_to_pdf_with_reportlab(docx_path, pdf_path)
         else:
+            lo_exe = _find_libreoffice()
+            if lo_exe is None:
+                _docx_to_pdf_with_reportlab(docx_path, pdf_path)
+                return
             try:
                 subprocess.run(
-                    ["libreoffice", "--headless", "--convert-to", "pdf",
+                    [lo_exe, "--headless", "--convert-to", "pdf",
                      "--outdir", str(Path(pdf_path).parent.resolve()),
                      str(Path(docx_path).resolve())],
                     check=True, capture_output=True,

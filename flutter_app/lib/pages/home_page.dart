@@ -97,7 +97,17 @@ class _HomePageState extends State<HomePage> {
         : Directory(widget.provider.outputDir);
 
     if (dir.existsSync()) {
-      Process.start('explorer', [dir.path]);
+      _openInFileManager(dir.path);
+    }
+  }
+
+  void _openInFileManager(String path) {
+    if (Platform.isWindows) {
+      Process.start('explorer', [path]);
+    } else if (Platform.isMacOS) {
+      Process.start('open', [path]);
+    } else {
+      Process.start('xdg-open', [path]);
     }
   }
 
@@ -127,7 +137,7 @@ class _HomePageState extends State<HomePage> {
               Navigator.of(ctx).pop();
               final url = provider.downloadUrl;
               if (url != null && url.isNotEmpty) {
-                Process.start('explorer', [url]);
+                _openInFileManager(url);
               }
             },
             child: const Text('Download'),

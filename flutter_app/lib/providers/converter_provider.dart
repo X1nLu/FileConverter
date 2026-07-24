@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/file_item.dart';
 import '../models/task_progress.dart';
@@ -107,8 +108,13 @@ class ConverterProvider extends ChangeNotifier {
     _restoreOutputDir();
   }
 
-  static String get _defaultOutputDir =>
-      '${Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.'}\\Desktop\\FileConverterOutput';
+  static String get _defaultOutputDir {
+    final home = Platform.environment['HOME']
+        ?? Platform.environment['USERPROFILE']
+        ?? '.';
+    final desktop = path.join(home, 'Desktop', 'FileConverterOutput');
+    return desktop;
+  }
 
   /// Restore the user's previously chosen output directory, if any.
   /// The directory does not need to exist yet - it is created on demand
@@ -251,7 +257,7 @@ class ConverterProvider extends ChangeNotifier {
         dir.createSync(recursive: true);
       }
       // Try writing a temp file to verify write permission
-      final testFile = File('${dir.path}\\.write_test');
+      final testFile = File(path.join(dir.path, '.write_test'));
       testFile.writeAsStringSync('test');
       testFile.deleteSync();
       return true;
