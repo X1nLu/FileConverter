@@ -88,6 +88,25 @@ python3 main.py       # Linux/macOS
 
 > Flutter automatically starts the Python backend process. To debug the backend separately, run `python python_backend/main.py` (Windows) or `python3 python_backend/main.py` (Linux/macOS) manually.
 
+### Backend Policy Environment Variables (Optional)
+
+The backend supports optional safety policies for `/convert_by_path`:
+
+- `BACKEND_ALLOWED_INPUT_ROOT`
+    - Restrict `input_path` to a specific root directory.
+    - If set, paths outside this root return `403`.
+    - Example:
+        - Linux/macOS: `export BACKEND_ALLOWED_INPUT_ROOT=/home/user/Documents`
+        - Windows (PowerShell): `$env:BACKEND_ALLOWED_INPUT_ROOT='C:\\Users\\Me\\Documents'`
+
+- `BACKEND_ALLOWED_INPUT_EXTS`
+    - Restrict allowed source extensions for `input_path`.
+    - Comma-separated, with or without dots (e.g. `pdf,docx,md` or `.pdf,.docx,.md`).
+    - If set and extension is not allowed, request returns `400`.
+    - Example:
+        - Linux/macOS: `export BACKEND_ALLOWED_INPUT_EXTS=pdf,docx,md`
+        - Windows (PowerShell): `$env:BACKEND_ALLOWED_INPUT_EXTS='pdf,docx,md'`
+
 ### Option 2: Build Distributable (Windows)
 
 Use the one-click build script to package Python backend, build Flutter frontend, and generate Inno Setup installer.

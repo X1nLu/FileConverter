@@ -281,7 +281,7 @@ class TestAPIEndpoints(unittest.TestCase):
             )
 
     def test_convert_by_path_nonexistent(self):
-        """POST /convert_by_path with nonexistent file should return 403."""
+        """POST /convert_by_path with nonexistent file should return 404."""
         response = self.client.post(
             "/convert_by_path",
             data={
@@ -372,7 +372,7 @@ class TestAPIEndpoints(unittest.TestCase):
             )
 
     def test_convert_by_path_unsupported(self):
-        """POST /convert_by_path with unsupported conversion should return 403."""
+        """POST /convert_by_path with unsupported conversion should return 400."""
         from tests.test_converters import _make_sample_pdf
         import tempfile as tf
 
