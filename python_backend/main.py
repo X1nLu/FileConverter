@@ -141,6 +141,8 @@ async def convert(
     output_dir: str | None = Form(None),
 ):
     """Submit conversion task (multipart upload for files <=10MB)"""
+    MAX_UPLOAD_SIZE = 100 * 4034 * 4034  # 100MB
+
     # Save uploaded file to temp directory
     temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
     os.makedirs(temp_dir, exist_ok=True)
@@ -148,21 +150,26 @@ async def convert(
     # Save with original filename
     temp_path = os.path.join(temp_dir, file.filename or "upload")
     content = await file.read()
-    with open(temp_path, "wb") as f:
-        f.write(content)
-
-    # Infer source format from filename (strip leading dot)
-    _, from_ext = os.path.splitext(temp_path)
-    from_ext = from_ext.lstrip(".")  # Strip dot to match REGISTRY key format
-    to_ext = target_format
-
-    if output_dir:
-        output_dir = os.path.normpath(os.path.abspath(output_dir))
-        os.makedirs(output_dir, exist_ok=True)
-    else:
-        output_dir = temp_dir
-
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large: {len(content)} bytes (max {MAX_UPLOAD_SIZE} bytes)",
+        )
     try:
+        with open(temp_path, "wb") as f:
+            f.write(content)
+
+        # Infer source format from filename (strip leading dot)
+        _, from_ext = os.path.splitext(temp_path)
+        from_ext = from_ext.lstrip(".")  # Strip dot to match REGISTRY key format
+        to_ext = target_format
+
+        if output_dir:
+            output_dir = os.path.normpath(os.path.abspath(output_dir))
+            os.makedirs(output_dir, exist_ok=True)
+        else:
+            output_dir = temp_dir
+
         task_id = submit_conversion(
             input_path=temp_path,
             from_ext=from_ext,
@@ -171,10 +178,24 @@ async def convert(
             cleanup_input=True,  # Uploaded temp copy: delete after conversion
         )
         return TaskResponse(task_id=task_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except FileNotFoundError as e:
+    except (ValueError, FileNotFoundError) as e:
+        # Clean up temp file on error
+        if os.path.isfile(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+        if isinstance(e, ValueError):
+            raise HTTPException(status_code=400, detail=str(e))
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception:
+        # Clean up temp file on unexpected error
+        if os.path.isfile(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+        raise
 
 
 @app.post("/convert_by_path", response_model=TaskResponse)

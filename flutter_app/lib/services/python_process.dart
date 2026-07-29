@@ -243,11 +243,23 @@ class PythonProcessService {
           runInShell: true,
         );
       } else {
-        await Process.run(
-          'pkill',
-          ['-f', 'backend'],
+        // Use pgrep to find exact backend process by name, then kill by PID
+        // to avoid killing unrelated processes with 'pkill -f backend'.
+        final result = await Process.run(
+          'pgrep',
+          ['-x', 'backend'],
           runInShell: true,
         );
+        if (result.exitCode == 0 && result.stdout.toString().trim().isNotEmpty) {
+          final pids = result.stdout.toString().trim().split('\n');
+          for (final pid in pids) {
+            await Process.run(
+              'kill',
+              ['-9', pid.trim()],
+              runInShell: true,
+            );
+          }
+        }
       }
     } catch (_) {}
     await Future.delayed(const Duration(milliseconds: 650));
