@@ -30,6 +30,7 @@ _shutdown_requested = False
 _server: uvicorn.Server | None = None
 MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024  # 100MB
 UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1MB
+ALLOWED_INPUT_ROOT_ENV = "BACKEND_ALLOWED_INPUT_ROOT"
 
 
 def start_heartbeat_watchdog(heartbeat_path: str, timeout: float = 8.0, check_interval: float = 2.0):
@@ -160,6 +161,30 @@ def _prepare_conversion_params(input_path: str, target_format: str, output_dir: 
     return input_path, from_ext, to_ext, output_dir
 
 
+def _enforce_allowed_input_root(input_path: str):
+    """Optionally restrict /convert_by_path inputs to a configured root directory."""
+    root = os.environ.get(ALLOWED_INPUT_ROOT_ENV)
+    if not root:
+        return
+
+    root_abs = os.path.abspath(os.path.normpath(root))
+    path_abs = os.path.abspath(os.path.normpath(input_path))
+    try:
+        common = os.path.commonpath([path_abs, root_abs])
+    except ValueError:
+        # Different drives/platform-specific path issues
+        common = ""
+
+    if common != root_abs:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"input_path is outside allowed root: {root_abs}. "
+                f"Configure {ALLOWED_INPUT_ROOT_ENV} to adjust policy."
+            ),
+        )
+
+
 @app.post("/convert", response_model=TaskResponse)
 async def convert(
     file: UploadFile = File(...),
@@ -243,6 +268,8 @@ def convert_by_path(
     input_path, from_ext, to_ext, resolved_output = _prepare_conversion_params(
         input_path, target_format, output_dir
     )
+
+    _enforce_allowed_input_root(input_path)
 
     if not os.path.isfile(input_path):
         raise HTTPException(status_code=404, detail=f"File not found: {input_path}")

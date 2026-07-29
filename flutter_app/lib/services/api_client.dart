@@ -5,7 +5,9 @@ import '../config/api_config.dart';
 import '../models/task_progress.dart';
 
 class ApiClient {
-  final http.Client _client = http.Client();
+  final http.Client _client;
+
+  ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
   String _parseTaskResponse(http.Response response) {
     if (response.statusCode == 200) {
@@ -85,7 +87,7 @@ class ApiClient {
       await http.MultipartFile.fromPath('file', filePath),
     );
 
-    final streamedResponse = await request.send().timeout(
+    final streamedResponse = await _client.send(request).timeout(
       const Duration(seconds: 60),
     );
     final response = await http.Response.fromStream(streamedResponse);
@@ -106,7 +108,7 @@ class ApiClient {
     request.fields['target_format'] = targetFormat;
     request.fields['output_dir'] = outputDir;
 
-    final streamedResponse = await request.send().timeout(
+    final streamedResponse = await _client.send(request).timeout(
       const Duration(seconds: 30),
     );
     final response = await http.Response.fromStream(streamedResponse);
