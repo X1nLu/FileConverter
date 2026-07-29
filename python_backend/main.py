@@ -31,6 +31,7 @@ _server: uvicorn.Server | None = None
 MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024  # 100MB
 UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1MB
 ALLOWED_INPUT_ROOT_ENV = "BACKEND_ALLOWED_INPUT_ROOT"
+ALLOWED_INPUT_EXTS_ENV = "BACKEND_ALLOWED_INPUT_EXTS"
 
 
 def start_heartbeat_watchdog(heartbeat_path: str, timeout: float = 8.0, check_interval: float = 2.0):
@@ -185,6 +186,30 @@ def _enforce_allowed_input_root(input_path: str):
         )
 
 
+def _enforce_allowed_input_ext(from_ext: str):
+    """Optionally restrict /convert_by_path input extensions via environment variable."""
+    raw = os.environ.get(ALLOWED_INPUT_EXTS_ENV)
+    if not raw:
+        return
+
+    allowed = {
+        item.strip().lower().lstrip(".")
+        for item in raw.split(",")
+        if item.strip()
+    }
+    if not allowed:
+        return
+
+    if from_ext.lower() not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"input extension '{from_ext}' is not allowed by policy. "
+                f"Allowed: {sorted(allowed)}"
+            ),
+        )
+
+
 @app.post("/convert", response_model=TaskResponse)
 async def convert(
     file: UploadFile = File(...),
@@ -270,6 +295,7 @@ def convert_by_path(
     )
 
     _enforce_allowed_input_root(input_path)
+    _enforce_allowed_input_ext(from_ext)
 
     if not os.path.isfile(input_path):
         raise HTTPException(status_code=404, detail=f"File not found: {input_path}")

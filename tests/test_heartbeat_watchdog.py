@@ -313,6 +313,27 @@ class TestAPIEndpoints(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertIn("outside allowed root", response.json()["detail"].lower())
 
+    def test_convert_by_path_disallowed_extension_forbidden(self):
+        """When BACKEND_ALLOWED_INPUT_EXTS is set, disallowed input ext should return 400."""
+        response = None
+        with tempfile.TemporaryDirectory() as tmpdir:
+            md_path = os.path.join(tmpdir, "note.md")
+            Path(md_path).write_text("hello", encoding="utf-8")
+
+            with patch.dict(os.environ, {"BACKEND_ALLOWED_INPUT_EXTS": "pdf,docx"}, clear=False):
+                response = self.client.post(
+                    "/convert_by_path",
+                    data={
+                        "input_path": md_path,
+                        "target_format": "pdf",
+                        "output_dir": tmpdir,
+                    },
+                )
+
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("not allowed by policy", response.json()["detail"].lower())
+
     def test_convert_by_path_success(self):
         """POST /convert_by_path with valid file should return task_id and complete."""
         from tests.test_converters import _make_sample_pdf

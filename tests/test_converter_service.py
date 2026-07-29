@@ -389,6 +389,12 @@ class TestSubmitConversionExtended(unittest.TestCase):
                 self.assertIsNotNone(task)
                 self.assertEqual(task.status, "failed")
                 self.assertIn("timed out", (task.error or "").lower())
+
+                # Ensure status does not flip to completed after the worker eventually exits.
+                time.sleep(0.25)
+                task_after = task_manager.get_task(task_id)
+                self.assertIsNotNone(task_after)
+                self.assertEqual(task_after.status, "failed")
         finally:
             if old is None:
                 del cs.REGISTRY[key]
