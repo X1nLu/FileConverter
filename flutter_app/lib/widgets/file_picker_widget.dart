@@ -3,14 +3,16 @@ import 'package:file_picker/file_picker.dart';
 import '../models/file_item.dart';
 
 class FilePickerWidget extends StatelessWidget {
-  final FileItem? selectedFile;
-  final ValueChanged<FileItem?> onFilePicked;
-  final String? sourceFormat; // Currently selected source format key, limits file picker scope
+  final List<FileItem> selectedFiles;
+  final ValueChanged<List<FileItem>> onFilesPicked;
+  final VoidCallback? onClearFiles;
+  final String? sourceFormat;
 
   const FilePickerWidget({
     super.key,
-    this.selectedFile,
-    required this.onFilePicked,
+    this.selectedFiles = const [],
+    required this.onFilesPicked,
+    this.onClearFiles,
     this.sourceFormat,
   });
 
@@ -21,23 +23,24 @@ class FilePickerWidget extends StatelessWidget {
     return exts.map((e) => e.startsWith('.') ? e.substring(1) : e).toList();
   }
 
-  Future<void> _pickFile() async {
+  Future<void> _pickFiles() async {
     final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: _allowedExtensions ?? ['pdf', 'docx', 'xlsx', 'md', 'markdown', 'zip'],
     );
 
     if (result != null && result.files.isNotEmpty) {
-      final file = result.files.first;
-      if (file.path != null) {
-        final fileItem = FileItem(
-          name: file.name,
-          path: file.path!,
-          extension: file.extension != null ? '.${file.extension}' : '',
-          size: file.size,
-        );
-        onFilePicked(fileItem);
-      }
+      final fileItems = result.files
+          .where((f) => f.path != null)
+          .map((f) => FileItem(
+                name: f.name,
+                path: f.path!,
+                extension: f.extension != null ? '.' + f.extension! : '',
+                size: f.size,
+              ))
+          .toList();
+      onFilesPicked(fileItems);
     }
   }
 
@@ -46,26 +49,26 @@ class FilePickerWidget extends StatelessWidget {
     final theme = Theme.of(context);
 
     return InkWell(
-      onTap: _pickFile,
+      onTap: _pickFiles,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
         decoration: BoxDecoration(
           border: Border.all(
-            color: selectedFile != null
+            color: selectedFiles.isNotEmpty
                 ? theme.colorScheme.primary.withValues(alpha: 0.5)
                 : theme.colorScheme.outline.withValues(alpha: 0.3),
             width: 2,
             strokeAlign: BorderSide.strokeAlignInside,
           ),
           borderRadius: BorderRadius.circular(16),
-          color: selectedFile != null
+          color: selectedFiles.isNotEmpty
               ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
               : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         ),
-        child: selectedFile != null
-            ? _buildFileInfo(theme)
+        child: selectedFiles.isNotEmpty
+            ? _buildFilesInfo(theme)
             : _buildPickPrompt(theme),
       ),
     );
@@ -82,7 +85,7 @@ class FilePickerWidget extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'Click to select file',
+          'Click to select files',
           style: theme.textTheme.titleMedium?.copyWith(
             color: theme.colorScheme.primary,
             fontWeight: FontWeight.w600,
@@ -99,51 +102,112 @@ class FilePickerWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildFileInfo(ThemeData theme) {
-    final file = selectedFile!;
-    final icon = _getFileIcon(file.extension);
+  Widget _buildFilesInfo(ThemeData theme) {
+    final count = selectedFiles.length;
+    final totalSize = selectedFiles.fold<int>(0, (sum, f) => sum + f.size);
+    final sizeStr = _formatTotalSize(totalSize);
 
-    return Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, size: 32, color: theme.colorScheme.onPrimaryContainer),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                file.name,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 4),
-              Text(
-                file.sizeFormatted,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              child: Icon(
+                Icons.insert_drive_file,
+                size: 32,
+                color: theme.colorScheme.onPrimaryContainer,
               ),
-            ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    count.toString() + ' file' + (count > 1 ? 's' : '') + ' selected',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    sizeStr,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onClearFiles != null)
+              IconButton(
+                onPressed: onClearFiles,
+                icon: const Icon(Icons.close),
+                tooltip: 'Clear all files',
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...selectedFiles.take(3).map((f) => _buildFileRow(f, theme)),
+        if (count > 3)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              '... and ' + (count - 3).toString() + ' more',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
           ),
-        ),
-        IconButton(
-          onPressed: () => onFilePicked(null),
-          icon: const Icon(Icons.close),
-          tooltip: 'Remove file',
-        ),
       ],
     );
+  }
+
+  Widget _buildFileRow(FileItem file, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            _getFileIcon(file.extension),
+            size: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              file.name,
+              style: theme.textTheme.bodySmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            file.sizeFormatted,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTotalSize(int size) {
+    if (size < 1024) return size.toString() + ' B';
+    if (size < 1048576) return (size / 1024).toStringAsFixed(1) + ' KB total';
+    if (size < 1073741824) {
+      return (size / 1048576).toStringAsFixed(1) + ' MB total';
+    }
+    return (size / 1073741824).toStringAsFixed(1) + ' GB total';
   }
 
   IconData _getFileIcon(String ext) {

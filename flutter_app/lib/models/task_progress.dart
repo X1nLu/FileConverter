@@ -5,6 +5,7 @@ class TaskProgress {
   final int total;
   final String? resultPath;
   final String? error;
+  final String? sourceFileName;
 
   TaskProgress({
     required this.taskId,
@@ -13,6 +14,7 @@ class TaskProgress {
     this.total = 1,
     this.resultPath,
     this.error,
+    this.sourceFileName,
   });
 
   factory TaskProgress.fromJson(Map<String, dynamic> json) {

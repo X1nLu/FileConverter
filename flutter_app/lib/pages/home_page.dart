@@ -91,11 +91,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openOutputDir() {
-    final resultPath = widget.provider.currentTask?.resultPath;
-    final dir = resultPath != null
-        ? Directory(File(resultPath).parent.path)
-        : Directory(widget.provider.outputDir);
-
+    final dir = Directory(widget.provider.outputDir);
     if (dir.existsSync()) {
       _openInFileManager(dir.path);
     }
@@ -215,9 +211,9 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   FilePickerWidget(
-                    selectedFile: provider.selectedFile,
-                    onFilePicked: (file) => provider.setSelectedFile(file),
-                    sourceFormat: provider.selectedFile?.inferredFormat,
+                    selectedFiles: provider.selectedFiles,
+                    onFilesPicked: (files) => provider.setSelectedFiles(files),
+                    onClearFiles: () => provider.clearFiles(),
                   ),
                   const SizedBox(height: 16),
                   // Output directory: always visible so users can change
@@ -250,10 +246,10 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  if (provider.selectedFile != null) ...[
+                  if (provider.selectedFiles.isNotEmpty) ...[
                     FormatSelector(
                       formats: provider.formatsFor(
-                        provider.selectedFile!.extension,
+                        provider.selectedFiles.first.extension,
                       ),
                       selectedFormat: provider.selectedFormat,
                       onFormatSelected: (format) =>
@@ -266,10 +262,10 @@ class _HomePageState extends State<HomePage> {
                       child: FilledButton.icon(
                         onPressed:
                             provider.selectedFormat != null &&
-                                !provider.isLoading
-                            ? () => provider.startConversion()
+                                !provider.isConverting
+                            ? () => provider.startBatchConversion()
                             : null,
-                        icon: provider.isLoading
+                        icon: provider.isConverting
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
@@ -280,24 +276,25 @@ class _HomePageState extends State<HomePage> {
                               )
                             : const Icon(Icons.swap_horiz),
                         label: Text(
-                          provider.isLoading
-                              ? 'Submitting...'
+                          provider.isConverting
+                              ? 'Converting...'
                               : 'Start Conversion',
                         ),
                       ),
                     ),
                   ],
-                  if (provider.currentTask != null) ...[
-                    const SizedBox(height: 12),
+                  if (provider.isConverting || provider.isBatchDone) ...[
+                    const SizedBox(height: 16),
                     ConversionProgress(
-                      task: provider.currentTask!,
-                      outputDir: provider.currentTask!.isCompleted
+                      tasks: provider.taskList,
+                      completedCount: provider.completedCount,
+                      failedCount: provider.failedCount,
+                      outputDir: provider.isBatchDone
                           ? provider.outputDir
                           : null,
                       onOpenOutputDir: _openOutputDir,
                     ),
-                    if (provider.currentTask!.isCompleted ||
-                        provider.currentTask!.isFailed) ...[
+                    if (provider.isBatchDone) ...[
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,

@@ -28,3 +28,5 @@ python_backend/temp/
 .claude/
 .vscode/
 .meituan-catpaw/AGENTS.md
+.idea/
+.github/

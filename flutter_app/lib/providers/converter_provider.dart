@@ -43,9 +43,10 @@ class ConverterProvider extends ChangeNotifier {
   final ApiClient _apiClient = ApiClient();
   final PythonProcessService _pythonService = PythonProcessService();
 
-  FileItem? _selectedFile;
+  List<FileItem> _selectedFiles = [];
   FormatOption? _selectedFormat;
-  TaskProgress? _currentTask;
+  final Map<String, TaskProgress> _tasks = {};
+  final Map<String, Timer> _pollTimers = {};
   List<Map<String, dynamic>> _availableFormats = [];
   Map<String, List<String>> _conversions = {};
   StartupPhase _startupPhase = StartupPhase.none;
@@ -70,15 +71,30 @@ class ConverterProvider extends ChangeNotifier {
   String? get latestVersion => _latestVersion;
   String? get downloadUrl => _downloadUrl;
 
-  FileItem? get selectedFile => _selectedFile;
+  List<FileItem> get selectedFiles => _selectedFiles;
   FormatOption? get selectedFormat => _selectedFormat;
-  TaskProgress? get currentTask => _currentTask;
+  Map<String, TaskProgress> get tasks => _tasks;
+  List<TaskProgress> get taskList => _tasks.values.toList();
   List<Map<String, dynamic>> get availableFormats => _availableFormats;
   StartupPhase get startupPhase => _startupPhase;
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
   String? get error => _error;
-  bool get isConverting => _currentTask != null && !_currentTask!.isCompleted && !_currentTask!.isFailed;
+
+  /// Number of completed tasks
+  int get completedCount => _tasks.values.where((t) => t.isCompleted).length;
+
+  /// Number of failed tasks
+  int get failedCount => _tasks.values.where((t) => t.isFailed).length;
+
+  /// Total number of tasks
+  int get totalCount => _tasks.length;
+
+  /// Whether any conversion is in progress
+  bool get isConverting => _tasks.values.any((t) => !t.isCompleted && !t.isFailed);
+
+  /// Whether all tasks are done (completed or failed)
+  bool get isBatchDone => _tasks.isNotEmpty && _tasks.values.every((t) => t.isCompleted || t.isFailed);
 
   /// Startup phase display message
   String get startupMessage {
@@ -132,10 +148,18 @@ class ConverterProvider extends ChangeNotifier {
     }
   }
 
-  void setSelectedFile(FileItem? file) {
-    _selectedFile = file;
+  void setSelectedFiles(List<FileItem> files) {
+    _selectedFiles = files;
     _selectedFormat = null;
-    _currentTask = null;
+    _tasks.clear();
+    _error = null;
+    notifyListeners();
+  }
+
+  void clearFiles() {
+    _selectedFiles = [];
+    _selectedFormat = null;
+    _tasks.clear();
     _error = null;
     notifyListeners();
   }
@@ -268,86 +292,98 @@ class ConverterProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> startConversion() async {
-    if (_selectedFile == null || _selectedFormat == null) return;
-
-    // ── Extension Validation ──
-    final inferred = _selectedFile!.inferredFormat;
-    if (inferred == null) {
-      _error = 'Unsupported file format: ${_selectedFile!.extension}';
-      notifyListeners();
-      return;
-    }
-
-    // ── File Existence Check ──
-    if (!File(_selectedFile!.path).existsSync()) {
-      _error = 'File not found or has been moved';
-      notifyListeners();
-      return;
-    }
+  Future<void> startBatchConversion() async {
+    if (_selectedFiles.isEmpty || _selectedFormat == null) return;
 
     // ── Output Directory Validation ──
     if (!_validateOutputDir()) {
-      // _validateOutputDir already set _outputDirError
       return;
     }
 
     _isLoading = true;
     _error = null;
     _outputDirError = null;
-    _currentTask = null;
+    _tasks.clear();
     notifyListeners();
 
-    try {
-      debugPrint('Starting conversion: ${_selectedFile!.path} -> ${_selectedFormat!.value}');
-      final taskId = await _apiClient.submitConversion(
-        filePath: _selectedFile!.path,
-        targetFormat: _selectedFormat!.value,
-        outputDir: _outputDir,
-      );
-      debugPrint('Conversion task submitted: $taskId');
+    int submitted = 0;
+    for (final file in _selectedFiles) {
+      // ── Extension Validation ──
+      final inferred = file.inferredFormat;
+      if (inferred == null) {
+        debugPrint('Skipping unsupported file: ${file.name}');
+        continue;
+      }
 
-      _currentTask = TaskProgress(
-        taskId: taskId,
-        status: 'pending',
-      );
-      _isLoading = false;
-      notifyListeners();
+      // ── File Existence Check ──
+      if (!File(file.path).existsSync()) {
+        debugPrint('Skipping missing file: ${file.path}');
+        continue;
+      }
 
-      _startPolling(taskId);
-    } catch (e) {
-      debugPrint('Conversion failed: $e');
-      _isLoading = false;
-      _error = _extractMessage(e);
-      notifyListeners();
+      try {
+        debugPrint('Submitting conversion: ${file.name} -> ${_selectedFormat!.value}');
+        final taskId = await _apiClient.submitConversion(
+          filePath: file.path,
+          targetFormat: _selectedFormat!.value,
+          outputDir: _outputDir,
+        );
+        debugPrint('Task submitted: $taskId for ${file.name}');
+
+        _tasks[taskId] = TaskProgress(
+          taskId: taskId,
+          status: 'pending',
+          sourceFileName: file.name,
+        );
+        submitted++;
+        notifyListeners();
+
+        _startPolling(taskId);
+      } catch (e) {
+        debugPrint('Failed to submit ${file.name}: $e');
+        _error = _extractMessage(e);
+      }
     }
+
+    _isLoading = false;
+    if (submitted == 0 && _error == null) {
+      _error = 'No valid files to convert';
+    }
+    notifyListeners();
   }
 
   void _startPolling(String taskId) {
-    _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
-      try {
-        final progress = await _apiClient.getTaskProgress(taskId);
-        _currentTask = progress;
-        notifyListeners();
+    _pollTimers[taskId]?.cancel();
+    _pollTimers[taskId] = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) async {
+        try {
+          final progress = await _apiClient.getTaskProgress(taskId);
+          _tasks[taskId] = progress;
+          notifyListeners();
 
-        if (progress.isCompleted || progress.isFailed) {
-          _pollTimer?.cancel();
-          _pollTimer = null;
+          if (progress.isCompleted || progress.isFailed) {
+            _pollTimers[taskId]?.cancel();
+            _pollTimers.remove(taskId);
+          }
+        } catch (e) {
+          _pollTimers[taskId]?.cancel();
+          _pollTimers.remove(taskId);
+          _error = 'Failed to poll task status';
+          notifyListeners();
         }
-      } catch (e) {
-        _pollTimer?.cancel();
-        _pollTimer = null;
-        _error = 'Failed to poll task status';
-        notifyListeners();
-      }
-    });
+      },
+    );
   }
 
   void reset() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
-    _currentTask = null;
+    for (final timer in _pollTimers.values) {
+      timer.cancel();
+    }
+    _pollTimers.clear();
+    _tasks.clear();
+    _selectedFiles = [];
+    _selectedFormat = null;
     _error = null;
     _startupPhase = StartupPhase.none;
     _isInitialized = false;
@@ -380,7 +416,10 @@ class ConverterProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
+    for (final timer in _pollTimers.values) {
+      timer.cancel();
+    }
+    _pollTimers.clear();
     _apiClient.dispose();
     _pythonService.stop();
     super.dispose();
