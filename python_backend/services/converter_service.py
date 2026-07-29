@@ -47,6 +47,8 @@ ERROR_MESSAGES = [
     ("libreoffice", "PDF export requires LibreOffice"),
 ]
 
+CONVERSION_TIMEOUT_SECONDS = 5 * 60
+
 
 def get_formats() -> dict:
     """Return supported format list and source->targets conversion map."""
@@ -128,8 +130,6 @@ def submit_conversion(
 
     import threading
 
-    CONVERSION_TIMEOUT = 5 * 60  # 5 minutes max per conversion
-
     def _run():
         try:
             task_manager.set_running(task_id)
@@ -148,7 +148,7 @@ def submit_conversion(
 
             worker = threading.Thread(target=_call_converter, daemon=True)
             worker.start()
-            worker.join(timeout=CONVERSION_TIMEOUT)
+            worker.join(timeout=CONVERSION_TIMEOUT_SECONDS)
             if worker.is_alive():
                 task_manager.set_failed(task_id, "Conversion timed out, please try again")
                 return

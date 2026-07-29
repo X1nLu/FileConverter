@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import unittest
+from unittest.mock import patch
 from python_backend.services.converter_service import (
     submit_conversion,
     friendly_error,
@@ -356,6 +357,43 @@ class TestSubmitConversionExtended(unittest.TestCase):
                     task.status, "completed",
                     f"{from_ext} -> {to_ext}: expected completed, got {task.status}: {task.error}",
                 )
+
+    def test_submit_timeout(self):
+        """A conversion that exceeds timeout should be marked as failed."""
+        import python_backend.services.converter_service as cs
+
+        src = os.path.join(self.tmpdir.name, "slow.md")
+        Path(src).write_text("hello", encoding="utf-8")
+
+        def slow_converter(input_path, output_path, on_progress=None):
+            time.sleep(0.2)
+            Path(output_path).write_text("done", encoding="utf-8")
+
+        key = ("md", "md")
+        old = cs.REGISTRY.get(key)
+        cs.REGISTRY[key] = slow_converter
+        try:
+            with patch.object(cs, "CONVERSION_TIMEOUT_SECONDS", 0.05):
+                task_id = submit_conversion(
+                    input_path=src,
+                    from_ext="md",
+                    to_ext="md",
+                    output_dir=self.tmpdir.name,
+                )
+                for _ in range(50):
+                    task = task_manager.get_task(task_id)
+                    if task and task.status in ("completed", "failed"):
+                        break
+                    time.sleep(0.02)
+                task = task_manager.get_task(task_id)
+                self.assertIsNotNone(task)
+                self.assertEqual(task.status, "failed")
+                self.assertIn("timed out", (task.error or "").lower())
+        finally:
+            if old is None:
+                del cs.REGISTRY[key]
+            else:
+                cs.REGISTRY[key] = old
 
 
 if __name__ == "__main__":

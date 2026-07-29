@@ -10,6 +10,7 @@ import sys
 import socket
 import threading
 import time
+import uuid
 
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -27,6 +28,8 @@ from services.converter_service import get_formats, submit_conversion, task_mana
 _heartbeat_file: str | None = None
 _shutdown_requested = False
 _server: uvicorn.Server | None = None
+MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024  # 100MB
+UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
 def start_heartbeat_watchdog(heartbeat_path: str, timeout: float = 8.0, check_interval: float = 2.0):
@@ -164,21 +167,31 @@ async def convert(
     output_dir: str | None = Form(None),
 ):
     """Submit conversion task (multipart upload for files <=10MB)"""
-    MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
-
     temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
     os.makedirs(temp_dir, exist_ok=True)
 
-    temp_path = os.path.join(temp_dir, file.filename or "upload")
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large: {len(content)} bytes (max {MAX_UPLOAD_SIZE} bytes)",
-        )
+    # Use a unique filename to avoid collisions between concurrent uploads.
+    original_name = file.filename or "upload.bin"
+    _, ext = os.path.splitext(original_name)
+    temp_path = os.path.join(temp_dir, f"upload_{uuid.uuid4().hex}{ext}")
+
+    total_size = 0
     try:
         with open(temp_path, "wb") as f:
-            f.write(content)
+            while True:
+                chunk = await file.read(UPLOAD_CHUNK_SIZE)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > MAX_UPLOAD_SIZE_BYTES:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            f"File too large: {total_size} bytes "
+                            f"(max {MAX_UPLOAD_SIZE_BYTES} bytes)"
+                        ),
+                    )
+                f.write(chunk)
 
         _, from_ext, to_ext, resolved_output = _prepare_conversion_params(
             temp_path, target_format, output_dir
@@ -201,13 +214,23 @@ async def convert(
         if isinstance(e, ValueError):
             raise HTTPException(status_code=400, detail=str(e))
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception:
+    except HTTPException:
         if os.path.isfile(temp_path):
             try:
                 os.unlink(temp_path)
             except OSError:
                 pass
         raise
+    except Exception:
+        if os.path.isfile(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+        logging.exception("Unhandled /convert error")
+        raise
+    finally:
+        await file.close()
 
 
 @app.post("/convert_by_path", response_model=TaskResponse)

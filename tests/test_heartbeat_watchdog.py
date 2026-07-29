@@ -6,6 +6,7 @@ import time
 import json
 import tempfile
 import threading
+import uuid
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -245,6 +246,40 @@ class TestAPIEndpoints(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_convert_rejects_large_upload(self):
+        """POST /convert should reject files larger than MAX_UPLOAD_SIZE_BYTES with 413."""
+        import python_backend.main as main_mod
+
+        with patch.object(main_mod, "MAX_UPLOAD_SIZE_BYTES", 10):
+            response = self.client.post(
+                "/convert",
+                data={"target_format": "md"},
+                files={"file": ("big.pdf", b"12345678901", "application/pdf")},
+            )
+        self.assertEqual(response.status_code, 413)
+
+    def test_convert_cleans_temp_file_on_submit_error(self):
+        """POST /convert should clean temp upload if submit_conversion raises ValueError."""
+        temp_dir = os.path.join(_python_backend, "temp")
+        unique_name = f"f_{uuid.uuid4().hex}.pdf"
+        before = set(os.listdir(temp_dir)) if os.path.isdir(temp_dir) else set()
+
+        response = self.client.post(
+            "/convert",
+            data={"target_format": "zip"},  # unsupported from pdf -> zip
+            files={"file": (unique_name, b"dummy content", "application/pdf")},
+        )
+        self.assertEqual(response.status_code, 400)
+
+        if os.path.isdir(temp_dir):
+            after = set(os.listdir(temp_dir))
+            leftovers = [name for name in (after - before) if name.startswith("upload_")]
+            self.assertEqual(
+                leftovers,
+                [],
+                f"Temporary upload files were not cleaned: {leftovers}",
+            )
+
     def test_convert_by_path_nonexistent(self):
         """POST /convert_by_path with nonexistent file should return 403."""
         response = self.client.post(
@@ -281,7 +316,7 @@ class TestAPIEndpoints(unittest.TestCase):
             # Wait for conversion to complete
             task = None
             from services.converter_service import task_manager
-            for _ in range(983):
+            for _ in range(100):
                 task = task_manager.get_task(task_id)
                 if task and task.status in ("completed", "failed"):
                     break
