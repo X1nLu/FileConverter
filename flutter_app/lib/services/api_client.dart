@@ -7,6 +7,22 @@ import '../models/task_progress.dart';
 class ApiClient {
   final http.Client _client = http.Client();
 
+  String _parseTaskResponse(http.Response response) {
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data['task_id'] as String;
+    }
+
+    String message;
+    try {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      message = (data['detail'] ?? data['error'] ?? 'Conversion failed') as String;
+    } catch (_) {
+      message = response.reasonPhrase ?? 'Conversion failed';
+    }
+    throw Exception(message);
+  }
+
   Future<bool> checkHealth() async {
     try {
       final response = await _client
@@ -70,23 +86,10 @@ class ApiClient {
     );
 
     final streamedResponse = await request.send().timeout(
-      const Duration(seconds: 30),
+      const Duration(seconds: 60),
     );
     final response = await http.Response.fromStream(streamedResponse);
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return data['task_id'] as String;
-    } else {
-      String message;
-      try {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        message = (data['detail'] ?? data['error'] ?? 'Conversion failed') as String;
-      } catch (_) {
-        message = response.reasonPhrase ?? 'Conversion failed';
-      }
-      throw Exception(message);
-    }
+    return _parseTaskResponse(response);
   }
 
   /// Large file: pass absolute path for Python to read directly from disk
@@ -104,23 +107,10 @@ class ApiClient {
     request.fields['output_dir'] = outputDir;
 
     final streamedResponse = await request.send().timeout(
-      const Duration(seconds: 10),
+      const Duration(seconds: 30),
     );
     final response = await http.Response.fromStream(streamedResponse);
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return data['task_id'] as String;
-    } else {
-      String message;
-      try {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        message = (data['detail'] ?? data['error'] ?? 'Conversion failed') as String;
-      } catch (_) {
-        message = response.reasonPhrase ?? 'Conversion failed';
-      }
-      throw Exception(message);
-    }
+    return _parseTaskResponse(response);
   }
 
   Future<TaskProgress> getTaskProgress(String taskId) async {

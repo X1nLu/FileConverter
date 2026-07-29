@@ -128,6 +128,8 @@ def submit_conversion(
 
     import threading
 
+    CONVERSION_TIMEOUT = 5 * 60  # 5 minutes max per conversion
+
     def _run():
         try:
             task_manager.set_running(task_id)
@@ -135,7 +137,23 @@ def submit_conversion(
             on_progress = _make_on_progress(task_id)
             # Report initial progress
             on_progress(0, 1)
-            fn(input_path, output_path, on_progress=on_progress)
+            # Run conversion in a child thread to enforce timeout while preserving errors.
+            run_error: list[Exception | None] = [None]
+
+            def _call_converter():
+                try:
+                    fn(input_path, output_path, on_progress=on_progress)
+                except Exception as e:
+                    run_error[0] = e
+
+            worker = threading.Thread(target=_call_converter, daemon=True)
+            worker.start()
+            worker.join(timeout=CONVERSION_TIMEOUT)
+            if worker.is_alive():
+                task_manager.set_failed(task_id, "Conversion timed out, please try again")
+                return
+            if run_error[0] is not None:
+                raise run_error[0]
             task_manager.set_completed(task_id, output_path)
         except Exception as e:
             task_manager.set_failed(task_id, friendly_error(str(e), from_ext))

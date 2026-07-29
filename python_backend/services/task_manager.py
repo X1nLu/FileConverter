@@ -28,7 +28,7 @@ class TaskManager:
     def __init__(self, max_concurrent: int = 4, task_ttl_seconds: float = 1800):
         self._lock = threading.Lock()
         self._tasks: dict[str, Task] = {}
-        self._semaphore = threading.Semaphore(max_concurrent)
+        self._semaphore = threading.BoundedSemaphore(max_concurrent)
         self._task_ttl = task_ttl_seconds
 
     # ── Lifecycle ─────────────────────────────────────────────────────
@@ -87,7 +87,12 @@ class TaskManager:
         return self._semaphore.acquire(blocking=False)
 
     def release_slot(self):
-        self._semaphore.release()
+        # Guard against over-release: semaphore count should not exceed max_concurrent
+        try:
+            self._semaphore.release()
+        except ValueError:
+            # Semaphore released more times than acquired — ignore
+            pass
 
     # ── Eviction ──────────────────────────────────────────────────────
 

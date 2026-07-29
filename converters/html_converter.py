@@ -508,8 +508,9 @@ class HtmlConverter:
                     dest = assets_dir / new_name
                     dest.write_bytes(data)
             except Exception:
+                import logging
+                logging.warning("Failed to extract resource: %s", orig_path)
                 # Skip unextractable resources
-                pass
 
     @staticmethod
     def _find_asset_in_zip(z: zipfile.ZipFile, orig_path: str) -> list:

@@ -292,10 +292,18 @@ class PythonProcessService {
             '${_process!.pid}',
           ], runInShell: true);
         } else {
-          _process!.kill(ProcessSignal.sigterm);
+          try {
+            _process!.kill(ProcessSignal.sigterm);
+          } catch (_) {
+            // Process may already have exited
+          }
           await Future.delayed(const Duration(milliseconds: 300));
           if (_process != null) {
-            _process!.kill(ProcessSignal.sigkill);
+            try {
+              _process!.kill(ProcessSignal.sigkill);
+            } catch (_) {
+              // Process may already have exited
+            }
           }
         }
       } catch (_) {

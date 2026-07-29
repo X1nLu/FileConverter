@@ -4,11 +4,14 @@ FastAPI + Uvicorn, auto port allocation, outputs PORT:xxxx via stdout
 """
 
 import asyncio
+import logging
 import os
 import sys
 import socket
 import threading
 import time
+
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s")
 
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -134,6 +137,26 @@ def formats():
     return FormatsResponse(formats=data["formats"], conversions=data["conversions"])
 
 
+# ── Helper: prepare conversion parameters ────────────────────────────
+
+
+def _prepare_conversion_params(input_path: str, target_format: str, output_dir: str | None):
+    """Normalize paths, infer source format, and ensure output dir exists."""
+    input_path = os.path.normpath(os.path.abspath(input_path))
+    _, from_ext = os.path.splitext(input_path)
+    from_ext = from_ext.lstrip(".")
+    to_ext = target_format
+
+    if output_dir:
+        output_dir = os.path.normpath(os.path.abspath(output_dir))
+        os.makedirs(output_dir, exist_ok=True)
+    else:
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
+        os.makedirs(output_dir, exist_ok=True)
+
+    return input_path, from_ext, to_ext, output_dir
+
+
 @app.post("/convert", response_model=TaskResponse)
 async def convert(
     file: UploadFile = File(...),
@@ -141,13 +164,11 @@ async def convert(
     output_dir: str | None = Form(None),
 ):
     """Submit conversion task (multipart upload for files <=10MB)"""
-    MAX_UPLOAD_SIZE = 100 * 4034 * 4034  # 100MB
+    MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
 
-    # Save uploaded file to temp directory
     temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
     os.makedirs(temp_dir, exist_ok=True)
 
-    # Save with original filename
     temp_path = os.path.join(temp_dir, file.filename or "upload")
     content = await file.read()
     if len(content) > MAX_UPLOAD_SIZE:
@@ -159,27 +180,19 @@ async def convert(
         with open(temp_path, "wb") as f:
             f.write(content)
 
-        # Infer source format from filename (strip leading dot)
-        _, from_ext = os.path.splitext(temp_path)
-        from_ext = from_ext.lstrip(".")  # Strip dot to match REGISTRY key format
-        to_ext = target_format
-
-        if output_dir:
-            output_dir = os.path.normpath(os.path.abspath(output_dir))
-            os.makedirs(output_dir, exist_ok=True)
-        else:
-            output_dir = temp_dir
+        _, from_ext, to_ext, resolved_output = _prepare_conversion_params(
+            temp_path, target_format, output_dir
+        )
 
         task_id = submit_conversion(
             input_path=temp_path,
             from_ext=from_ext,
             to_ext=to_ext,
-            output_dir=output_dir,
+            output_dir=resolved_output,
             cleanup_input=True,  # Uploaded temp copy: delete after conversion
         )
         return TaskResponse(task_id=task_id)
     except (ValueError, FileNotFoundError) as e:
-        # Clean up temp file on error
         if os.path.isfile(temp_path):
             try:
                 os.unlink(temp_path)
@@ -189,7 +202,6 @@ async def convert(
             raise HTTPException(status_code=400, detail=str(e))
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
-        # Clean up temp file on unexpected error
         if os.path.isfile(temp_path):
             try:
                 os.unlink(temp_path)
@@ -205,28 +217,19 @@ def convert_by_path(
     output_dir: str | None = Form(None),
 ):
     """Submit conversion task (by path for files >10MB, Python reads disk directly)"""
-    input_path = os.path.normpath(os.path.abspath(input_path))
+    input_path, from_ext, to_ext, resolved_output = _prepare_conversion_params(
+        input_path, target_format, output_dir
+    )
 
     if not os.path.isfile(input_path):
         raise HTTPException(status_code=404, detail=f"File not found: {input_path}")
-
-    _, from_ext = os.path.splitext(input_path)
-    from_ext = from_ext.lstrip(".")
-    to_ext = target_format
-
-    if output_dir:
-        output_dir = os.path.normpath(os.path.abspath(output_dir))
-        os.makedirs(output_dir, exist_ok=True)
-    else:
-        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
-        os.makedirs(output_dir, exist_ok=True)
 
     try:
         task_id = submit_conversion(
             input_path=input_path,
             from_ext=from_ext,
             to_ext=to_ext,
-            output_dir=output_dir,
+            output_dir=resolved_output,
         )
         return TaskResponse(task_id=task_id)
     except ValueError as e:

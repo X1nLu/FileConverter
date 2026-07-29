@@ -24,7 +24,7 @@ class WordConverter:
         ws.title = "Document Content"
 
         # Count total items for progress
-        total_items = len(doc.paragraphs) + len(doc.tables)
+        total_items = max(len(doc.paragraphs) + len(doc.tables), 1)
         done = 0
 
         row_idx = 1
@@ -57,7 +57,7 @@ class WordConverter:
         lines = []
 
         # Count total items for progress
-        total_items = len(doc.paragraphs) + len(doc.tables)
+        total_items = max(len(doc.paragraphs) + len(doc.tables), 1)
         done = 0
 
         for para in doc.paragraphs:
