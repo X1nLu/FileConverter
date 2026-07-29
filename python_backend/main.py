@@ -26,7 +26,7 @@ _shutdown_requested = False
 _server: uvicorn.Server | None = None
 
 
-def start_heartbeat_watchdog(heartbeat_path: str, timeout: float = 8.0):
+def start_heartbeat_watchdog(heartbeat_path: str, timeout: float = 8.0, check_interval: float = 2.0):
     """Start heartbeat watchdog: exit if heartbeat file not updated within timeout seconds."""
     global _heartbeat_file
     _heartbeat_file = heartbeat_path
@@ -45,7 +45,7 @@ def start_heartbeat_watchdog(heartbeat_path: str, timeout: float = 8.0):
                     os._exit(0)
             except Exception:
                 pass
-            time.sleep(2)
+            time.sleep(check_interval)
 
     t = threading.Thread(target=_watch, daemon=True)
     t.start()

@@ -57,15 +57,15 @@ class FilePickerWidget extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border.all(
             color: selectedFiles.isNotEmpty
-                ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                : theme.colorScheme.outline.withValues(alpha: 0.3),
+                ? theme.colorScheme.primary.withOpacity(0.5)
+                : theme.colorScheme.outline.withOpacity(0.3),
             width: 2,
             strokeAlign: BorderSide.strokeAlignInside,
           ),
           borderRadius: BorderRadius.circular(16),
           color: selectedFiles.isNotEmpty
-              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
-              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              ? theme.colorScheme.primaryContainer.withOpacity(0.3)
+              : theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
         ),
         child: selectedFiles.isNotEmpty
             ? _buildFilesInfo(theme)
