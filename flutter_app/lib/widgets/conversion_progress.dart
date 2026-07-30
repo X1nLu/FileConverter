@@ -60,7 +60,7 @@ class _ConversionProgressState extends State<ConversionProgress> {
               ),
               const SizedBox(height: 8),
               Text(
-                done.toString() + ' / ' + total.toString() + ' files processed',
+                '$done / $total files processed',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -149,7 +149,7 @@ class _ConversionProgressState extends State<ConversionProgress> {
               children: [
                 Text(
                   widget.failedCount > 0
-                      ? widget.completedCount.toString() + ' of ' + total.toString() + ' converted'
+                      ? '${widget.completedCount} of $total converted'
                       : 'All conversions complete!',
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: widget.failedCount > 0
@@ -160,7 +160,7 @@ class _ConversionProgressState extends State<ConversionProgress> {
                 ),
                 if (widget.failedCount > 0)
                   Text(
-                    widget.failedCount.toString() + ' file' + (widget.failedCount > 1 ? 's' : '') + ' failed',
+                    '${widget.failedCount} file${widget.failedCount > 1 ? 's' : ''} failed',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.error,
                     ),
@@ -182,7 +182,7 @@ class _ConversionProgressState extends State<ConversionProgress> {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'Converting ' + done.toString() + ' of ' + total.toString() + ' files...',
+            'Converting $done of $total files...',
             style: theme.textTheme.bodyMedium,
           ),
         ),
