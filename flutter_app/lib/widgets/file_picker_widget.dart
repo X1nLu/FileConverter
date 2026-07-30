@@ -44,7 +44,7 @@ class FilePickerWidget extends StatelessWidget {
           .map((f) => FileItem(
                 name: f.name,
                 path: f.path!,
-                extension: f.extension != null ? '.' + f.extension! : '',
+                extension: f.extension != null ? '.${f.extension!}' : '',
                 size: f.size,
               ))
           .toList();
@@ -139,7 +139,7 @@ class FilePickerWidget extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    count.toString() + ' file' + (count > 1 ? 's' : '') + ' selected',
+                    '$count file${count > 1 ? 's' : ''} selected',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -168,7 +168,7 @@ class FilePickerWidget extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              '... and ' + (count - 3).toString() + ' more',
+              '... and ${count - 3} more',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontStyle: FontStyle.italic,
@@ -210,12 +210,12 @@ class FilePickerWidget extends StatelessWidget {
   }
 
   String _formatTotalSize(int size) {
-    if (size < 1024) return size.toString() + ' B';
-    if (size < 1048576) return (size / 1024).toStringAsFixed(1) + ' KB total';
+    if (size < 1024) return '$size B';
+    if (size < 1048576) return '${(size / 1024).toStringAsFixed(1)} KB total';
     if (size < 1073741824) {
-      return (size / 1048576).toStringAsFixed(1) + ' MB total';
+      return '${(size / 1048576).toStringAsFixed(1)} MB total';
     }
-    return (size / 1073741824).toStringAsFixed(1) + ' GB total';
+    return '${(size / 1073741824).toStringAsFixed(1)} GB total';
   }
 
   IconData _getFileIcon(String ext) {

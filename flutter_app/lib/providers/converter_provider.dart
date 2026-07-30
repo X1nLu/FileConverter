@@ -53,7 +53,6 @@ class ConverterProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isInitialized = false;
   String? _error;
-  Timer? _pollTimer;
 
   // ── Output Directory Management ──
   late String _outputDir;
