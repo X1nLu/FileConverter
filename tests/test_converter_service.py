@@ -118,7 +118,7 @@ class TestGetFormats(unittest.TestCase):
     def test_conversions_count(self):
         data = get_formats()
         total = sum(len(v) for v in data["conversions"].values())
-        self.assertEqual(total, 13, f"Expected 13 conversion entries, got {total}")
+        self.assertEqual(total, 14, f"Expected 14 conversion entries, got {total}")
 
 
 class TestCleanupInput(unittest.TestCase):

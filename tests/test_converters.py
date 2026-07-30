@@ -2,6 +2,7 @@
 
 import os
 import sys
+import json
 import tempfile
 import threading
 from pathlib import Path
@@ -83,12 +84,53 @@ def _make_sample_zip(path: str):
         z.writestr("test.html", html.encode("utf-8"))
 
 
+def _make_sample_xmind(path: str):
+    """Create a minimal XMind (ZIP) with content.json."""
+    import zipfile
+
+    content = [
+        {
+            "id": "sheet-1",
+            "title": "Sample Sheet",
+            "rootTopic": {
+                "id": "root-1",
+                "title": "Root Topic",
+                "children": {
+                    "attached": [
+                        {
+                            "id": "topic-1",
+                            "title": "Branch A",
+                            "children": {
+                                "attached": [
+                                    {"id": "topic-1-1", "title": "Leaf A1"}
+                                ]
+                            },
+                        },
+                        {"id": "topic-2", "title": "Branch B"},
+                    ]
+                },
+            },
+            "theme": {
+                "map": {
+                    "properties": {
+                        "multi-line-colors": "#FFC947 #E46D57 #1F3C88"
+                    }
+                }
+            },
+        }
+    ]
+
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("content.json", json.dumps(content).encode("utf-8"))
+
+
 SAMPLE_MAKERS = {
     "pdf": _make_sample_pdf,
     "xlsx": _make_sample_xlsx,
     "docx": _make_sample_docx,
     "md": _make_sample_md,
     "zip": _make_sample_zip,
+    "xmind": _make_sample_xmind,
 }
 
 # Conversions that are expected to work
@@ -106,6 +148,7 @@ EXPECTED_CONVERSIONS = [
     ("md", "xlsx"),
     ("md", "docx"),
     ("zip", "md"),
+    ("xmind", "pdf"),
 ]
 
 
@@ -121,7 +164,7 @@ class TestRegistry(unittest.TestCase):
         )
 
     def test_registry_count(self):
-        self.assertEqual(len(REGISTRY), 13)
+        self.assertEqual(len(REGISTRY), 14)
 
 
 class TestConversions(unittest.TestCase):

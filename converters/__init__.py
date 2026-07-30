@@ -3,6 +3,7 @@ from .excel_converter import ExcelConverter
 from .word_converter import WordConverter
 from .markdown_converter import MarkdownConverter
 from .html_converter import HtmlConverter
+from .xmind_converter import XMindConverter
 
 REGISTRY = {
     ("pdf", "xlsx"): PdfConverter.to_excel,
@@ -18,6 +19,7 @@ REGISTRY = {
     ("md", "xlsx"):  MarkdownConverter.to_excel,
     ("md", "docx"):  MarkdownConverter.to_word,
     ("zip", "md"):   HtmlConverter.to_markdown,
+    ("xmind", "pdf"): XMindConverter.to_pdf,
 }
 
 def get_supported_conversions():

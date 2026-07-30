@@ -7,6 +7,7 @@ const extValidMap = <String, Set<String>>{
   'docx': {'.docx'},
   'md': {'.md', '.markdown'},
   'zip': {'.zip'},
+  'xmind': {'.xmind'},
 };
 
 /// Infer source format from file extension
@@ -86,6 +87,10 @@ class FormatOption {
     FormatOption(label: 'Markdown (.md)', value: 'md'),
   ];
 
+  static const List<FormatOption> xmindFormats = [
+    FormatOption(label: 'PDF (.pdf)', value: 'pdf'),
+  ];
+
   static List<FormatOption> getFormats(String extension) {
     switch (extension.toLowerCase()) {
       case '.pdf':
@@ -99,6 +104,8 @@ class FormatOption {
         return markdownFormats;
       case '.zip':
         return zipFormats;
+      case '.xmind':
+        return xmindFormats;
       default:
         return [];
     }

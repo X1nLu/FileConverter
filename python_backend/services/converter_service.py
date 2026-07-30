@@ -21,6 +21,7 @@ EXT_VALID_MAP = {
     "docx": {".docx"},
     "md": {".md", ".markdown"},
     "zip": {".zip"},
+    "xmind": {".xmind"},
 }
 
 # Format description map
@@ -30,6 +31,7 @@ EXT_DESC_MAP = {
     "docx": "Word",
     "md": "Markdown",
     "zip": "ZIP",
+    "xmind": "XMind",
 }
 
 # Friendly error message map
@@ -75,6 +77,7 @@ def friendly_error(raw: str, from_ext: str) -> str:
         "docx": "Word file cannot be read, may be corrupted",
         "md": "Markdown file cannot be read",
         "zip": "ZIP file cannot be read, may be corrupted",
+        "xmind": "XMind file cannot be read, may be corrupted",
     }
     return fallback.get(from_ext, "File cannot be read, may be corrupted")
 

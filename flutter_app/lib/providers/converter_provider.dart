@@ -258,6 +258,8 @@ class ConverterProvider extends ChangeNotifier {
         return 'Excel (.xlsx)';
       case 'md':
         return 'Markdown (.md)';
+      case 'xmind':
+        return 'XMind (.xmind)';
       default:
         return ext.toUpperCase();
     }
