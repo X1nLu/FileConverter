@@ -29,4 +29,7 @@ python_backend/temp/
 .vscode/
 .meituan-catpaw/AGENTS.md
 .idea/
-.github/
+.github/*
+!.github/workflows/
+!.github/workflows/*.yml
+!.github/workflows/*.yaml

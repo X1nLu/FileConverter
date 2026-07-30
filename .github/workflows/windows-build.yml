@@ -1,0 +1,91 @@
+name: Build Windows Package
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.x"
+          channel: "stable"
+          cache: true
+
+      - name: Install Python dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pywin32
+
+      - name: Install Flutter dependencies
+        working-directory: flutter_app
+        shell: pwsh
+        run: flutter pub get
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build backend + exe + installer
+        shell: cmd
+        run: build_all.bat
+
+      - name: Collect build artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+
+          $releaseDir = "flutter_app/build/windows/x64/runner/Release"
+          if (!(Test-Path "$releaseDir/flutter_app.exe")) {
+            throw "flutter_app.exe not found in $releaseDir"
+          }
+
+          Copy-Item "$releaseDir/flutter_app.exe" "artifacts/" -Force
+
+          if (Test-Path "$releaseDir/backend") {
+            Copy-Item "$releaseDir/backend" "artifacts/backend" -Recurse -Force
+          }
+
+          $setup = Get-ChildItem "installer" -Filter "FileConverter_Setup_v*.exe" | Select-Object -First 1
+          if ($null -ne $setup) {
+            Copy-Item $setup.FullName "artifacts/" -Force
+          } else {
+            throw "Installer exe not found in installer/"
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: FileConverter-windows-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish download link
+        shell: pwsh
+        run: |
+          $runUrl = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows build complete"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ""
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Artifacts are available on this run page:"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ""
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- $runUrl"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ""
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Uploaded files include:"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- flutter_app.exe"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- backend/ (runtime backend files)"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- FileConverter_Setup_v*.exe"
